@@ -26,12 +26,13 @@
 
 #ifdef ALLWINNER
 #include <mach/sys_config.h>
-extern int sw_usb_disable_hcd(__u32 usbc_no);
-extern int sw_usb_enable_hcd(__u32 usbc_no);
+extern int sunxi_usb_disable_hcd(__u32 usbc_no);
+extern int sunxi_usb_enable_hcd(__u32 usbc_no);
+extern void rf_module_power(int on);
 static script_item_u item;
 //extern int script_parser_fetch(char *main_name, char *sub_name, int value[], int count);
 
-static int usb_wifi_host = 2;
+static int usb_wifi_host = 3;
 #endif /*ALLWINNER_PLATFORM*/
 
 #ifdef AMLOGIC
@@ -689,8 +690,10 @@ INT __init rtusb_init(void)
 	printk("%s: sw_usb_enable_hcd: usbc_num = %d\n", DRIVER_ROLE, item.val);
 
 #endif
+	rf_module_power(1);
+	mdelay(100);
         //sw_usb_enable_hcd(usb_wifi_host);
-        sw_usb_enable_hcd(item.val);
+        sunxi_usb_enable_hcd(item.val);
 #endif
 
 #ifdef AMLOGIC
@@ -713,7 +716,8 @@ VOID __exit rtusb_exit(void)
 	usb_deregister(&rtusb_driver);	
 #ifdef ALLWINNER
         printk("%s: sw_usb_disable_hcd: usbc_num = %d\n",DRIVER_ROLE, item.val);
-        sw_usb_disable_hcd(item.val);
+        sunxi_usb_disable_hcd(item.val);
+	rf_module_power(0);
 #endif
 
 #ifdef AMLOGIC

@@ -1281,7 +1281,7 @@ static VOID MT7601_ChipSwitchChannel(
 
 	RTMP_CHIP_CAP *pChipCap = &pAd->chipCap;
 	
-	DBGPRINT(RT_DEBUG_OFF, ("%s: SwitchChannel#%d(RF=%d, %dT)\n",
+	DBGPRINT(RT_DEBUG_TRACE, ("%s: SwitchChannel#%d(RF=%d, %dT)\n",
 				__FUNCTION__, Channel, pAd->RfIcType, pAd->Antenna.field.TxPath));
 
 #ifdef MT7601FPGA
@@ -3868,7 +3868,7 @@ Note:
   UCHAR         pre_R75_Value = 0x0;
   UCHAR         pre_R76_Value = 0x0;
   //UCHAR         debug_value = 0x0;
-  //ULONG         per=0;
+  ULONG         Now32;
 
   INT16 BW20_RSSI_THR0 = pAd->CommonCfg.Bw20RssiThr0; //Default: -36dBm(BW_20)
   INT16 BW20_RSSI_THR1 = pAd->CommonCfg.Bw20RssiThr1; //Default: -50dBm(BW_20)
@@ -3909,7 +3909,10 @@ Note:
   	DBGPRINT(RT_DEBUG_TRACE, ("No connection! Set fake rssi= -80!!!\n"));
   	rssi = -80;
   } 
-
+  if (RTMP_TIME_AFTER(Now32, pAd->StaCfg.LastBeaconRxTime+1000) && OPSTATUS_TEST_FLAG(pAd, fOP_STATUS_MEDIA_STATE_CONNECTED)) {
+	DBGPRINT(RT_DEBUG_TRACE, ("beacon lose >1000ms ! Set fake rssi= -80!!!\n"));
+	rssi = -80;
+  }
   if (!rssi|| !init_main_vga || !init_aux_vga)
   {
     DBGPRINT(RT_DEBUG_TRACE, ("!!![%s]rssi or init_vga is 0!!!\n",__FUNCTION__));

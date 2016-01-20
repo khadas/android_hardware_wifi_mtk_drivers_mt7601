@@ -363,6 +363,112 @@ VOID CntlIdleProc(
 		TDLS_CntlOidTDLSRequestProc(pAd, Elem);
 		break;
 #endif /* DOT11Z_TDLS_SUPPORT */
+	case MT2_SCAN_CONF:
+		 if (Elem->MsgType == MT2_SCAN_CONF){
+			USHORT	Status = MLME_SUCCESS;
+				
+			NdisMoveMemory(&Status, Elem->Msg, sizeof(USHORT));
+				
+			/* Resume TxRing after SCANING complete. We hope the out-of-service time */
+			/* won't be too long to let upper layer time-out the waiting frames */
+			RTMPResumeMsduTransmission(pAd);
+
+			pAd->Mlme.CntlMachine.CurrState = CNTL_IDLE;
+
+			/* scan completed, init to not FastScan */
+			pAd->StaCfg.bImprovedScan = FALSE;
+
+//yiwei cfg
+#ifdef RT_CFG80211_SUPPORT
+                        RTEnqueueInternalCmd(pAd, CMDTHREAD_SCAN_END, NULL, 0);
+#endif /* RT_CFG80211_SUPPORT */
+
+
+#ifdef LED_CONTROL_SUPPORT
+			/* */
+			/* Set LED status to previous status. */
+			/* */
+			if (pAd->LedCntl.bLedOnScanning) {
+				pAd->LedCntl.bLedOnScanning = FALSE;
+				RTMPSetLED(pAd, pAd->LedCntl.LedStatus);
+			}
+#endif /* LED_CONTROL_SUPPORT */
+
+#ifdef DOT11N_DRAFT3
+			/* AP sent a 2040Coexistence mgmt frame, then station perform a scan, and then send back the respone. */
+			if ((pAd->CommonCfg.BSSCoexist2040.field.InfoReq == 1)
+			    && INFRA_ON(pAd)
+			    && OPSTATUS_TEST_FLAG(pAd, fOP_STATUS_SCAN_2040)) {
+				Update2040CoexistFrameAndNotify(pAd, BSSID_WCID,
+								TRUE);
+			}
+#endif /* DOT11N_DRAFT3 */
+#ifdef WPA_SUPPLICANT_SUPPORT
+
+                        if ((pAd->IndicateMediaState != NdisMediaStateConnected) && 
+			    (pAd->StaCfg.WpaSupplicantUP != WPA_SUPPLICANT_ENABLE_WITH_WEB_UI) 
+#ifdef RT_CFG80211_SUPPORT
+			   /* YF@20130127: This is a WEXT solution for auto-reconnect when scanning.
+                            *              But it cauese the CFG80211 SME confuse in kernel, so add
+                            *              a rule to not going this case.    
+                            */
+                            && (FALSE)	
+#endif /* RT_CFG80211_SUPPORT */
+			   )
+                                {
+                                        BssTableSsidSort(pAd, &pAd->MlmeAux.SsidBssTab, (PCHAR)pAd->MlmeAux.Ssid, pAd->MlmeAux.SsidLen);
+                                        pAd->MlmeAux.BssIdx = 0;
+                                        IterateOnBssTab(pAd);
+                                }
+#endif // WPA_SUPPLICANT_SUPPORT //
+
+
+				if (Status == MLME_SUCCESS)
+				{
+					{
+						/* 
+							Maintain Scan Table 
+							MaxBeaconRxTimeDiff: 120 seconds
+							MaxSameBeaconRxTimeCount: 1
+						*/
+						MaintainBssTable(pAd, &pAd->ScanTab, 120, 2);
+					}
+					
+#ifdef P2P_SUPPORT
+				if (!((pAd->MlmeAux.ScanType == SCAN_P2P_SEARCH) || (pAd->MlmeAux.ScanType == SCAN_P2P)))
+#endif /* P2P_SUPPORT */
+				{
+					RTMPSendWirelessEvent(pAd, IW_SCAN_COMPLETED_EVENT_FLAG, NULL, BSS0, 0);
+
+#ifdef WPA_SUPPLICANT_SUPPORT
+					RtmpOSWrielessEventSend(pAd->net_dev, RT_WLAN_EVENT_SCAN, -1, NULL, NULL, 0);
+#endif /* WPA_SUPPLICANT_SUPPORT */
+				}
+
+#ifdef P2P_SUPPORT
+				if (pAd->P2pCfg.P2pCounter.bStartScan &&
+					((pAd->MlmeAux.ScanType == SCAN_P2P) || (pAd->MlmeAux.ScanType == SCAN_P2P_SEARCH)))
+				{
+
+					if (P2P_GO_ON(pAd))
+					{
+						P2PSetNextScanTimer(pAd, 10);
+					}
+					else
+						P2PSetListenTimer(pAd, 0);
+				}
+				pAd->P2pCfg.bPeriodicListen = TRUE;
+#endif /* P2P_SUPPORT */
+			}
+#ifdef IWSC_SUPPORT
+			if (pAd->StaCfg.BssType == BSS_ADHOC)
+			{
+				MlmeEnqueue(pAd, IWSC_STATE_MACHINE, IWSC_MT2_MLME_SCAN_DONE, 0, NULL, 0);
+				RTMP_MLME_HANDLER(pAd);
+			}
+#endif /* IWSC_SUPPORT */
+		}
+		break;
 
 	default:
 		DBGPRINT(RT_DEBUG_TRACE,

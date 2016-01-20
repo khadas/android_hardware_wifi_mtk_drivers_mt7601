@@ -1460,6 +1460,9 @@ VOID STAMlmePeriodicExec(
 	ULONG			    TxTotalCnt;
 	int 	i;
 	BOOLEAN bCheckBeaconLost = TRUE;
+#ifdef PBF_MONITOR_SUPPORT
+    UINT32 mac_reg = 0;
+#endif
 #ifdef CONFIG_PM
 #ifdef USB_SUPPORT_SELECTIVE_SUSPEND	
 	POS_COOKIE  pObj = (POS_COOKIE) pAd->OS_Cookie;
@@ -1566,9 +1569,9 @@ VOID STAMlmePeriodicExec(
 	}
 
 #ifdef PBF_MONITOR_SUPPORT
-	UINT32 mac_reg = 0;
+//	UINT32 mac_reg = 0;
 	RTMP_IO_READ32(pAd, TXRXQ_PCNT, &mac_reg);
-	DBGPRINT(RT_DEBUG_OFF, ("%s : TXRXQ_PCNT=0x%08x\n", DRIVER_ROLE, mac_reg));
+	DBGPRINT(RT_DEBUG_TRACE, ("%s : TXRXQ_PCNT=0x%08x\n", DRIVER_ROLE, mac_reg));
 
 	if (((mac_reg & 0xFF0000) >> 16) == 0) {
 		DBGPRINT(RT_DEBUG_TRACE, ("%s : %s::enable TX Queue\n", DRIVER_ROLE, __FUNCTION__));
@@ -2559,7 +2562,8 @@ VOID MlmeCalculateChannelQuality(
 	ULONG ChannelQuality = 0;  /* 0..100, Channel Quality Indication for Roaming*/
 #ifdef CONFIG_STA_SUPPORT
 	ULONG LastBeaconRxTime = 0;
-	ULONG BeaconLostTime = pAd->StaCfg.BeaconLostTime;
+//	ULONG BeaconLostTime = pAd->StaCfg.BeaconLostTime;
+	ULONG BeaconLostTime =2000;
 #endif /* CONFIG_STA_SUPPORT */
 
 #ifdef CONFIG_STA_SUPPORT
@@ -2639,7 +2643,7 @@ VOID MlmeCalculateChannelQuality(
 		(OneSecTxNoRetryOkCount < 2) && /* no heavy traffic*/
 		RTMP_TIME_AFTER(Now32, LastBeaconRxTime + BeaconLostTime))
 	{
-		DBGPRINT(RT_DEBUG_TRACE, ("BEACON lost > %ld msec with TxOkCnt=%ld -> CQI=0\n", BeaconLostTime * (1000 / OS_HZ) , TxOkCnt)); 
+		DBGPRINT(RT_DEBUG_TRACE, ("BEACON lost > %ld msec with TxOkCnt=%ld -> CQI=0\n", BeaconLostTime* (1000 / OS_HZ) , TxOkCnt)); 
 		ChannelQuality = 0;
 	}
 	else

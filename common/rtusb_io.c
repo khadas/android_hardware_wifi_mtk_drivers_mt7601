@@ -1777,6 +1777,12 @@ static NTSTATUS RT_Mac80211_ConnResultInfom(IN PRTMP_ADAPTER pAd, IN PCmdQElmt C
 {
 #ifdef CONFIG_STA_SUPPORT
 	//yiwei cfg
+//	if(!CFG80211_checkScanResInKernelCache(pAd,pAd->MlmeAux.Bssid,pAd->MlmeAux.Ssid,pAd->MlmeAux.SsidLen)) {
+//		DBGPRINT(RT_DEBUG_TRACE, ("RT_Mac80211_ConnResultInfom bss not found \n"));
+//		RT_CFG80211_CONN_RESULT_INFORM(pAd, pAd->MlmeAux.Bssid, NULL, 0,
+  //                                                          NULL, 0, 0);
+//	} else 
+	CFG80211_checkStaScanTable(pAd);
 	RT_CFG80211_CONN_RESULT_INFORM(pAd,
 								pAd->MlmeAux.Bssid,
 								/*CMDQelmt->buffer, CMDQelmt->bufferlength,*/

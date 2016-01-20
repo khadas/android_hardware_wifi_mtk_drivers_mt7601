@@ -1275,7 +1275,7 @@ BOOLEAN CFG80211DRV_OpsScanCheckStatus(
 {
 #ifdef CONFIG_STA_SUPPORT
 	PRTMP_ADAPTER pAd = (PRTMP_ADAPTER)pAdOrg;
-        CFG80211DBG(RT_DEBUG_TRACE, ("80211> CFG80211DRV_OpsScan ==> \n")); 
+        CFG80211DBG(RT_DEBUG_TRACE, ("80211> CFG80211DRV_OpsScan CFG80211DRV_OpsScanCheckStatus==> \n")); 
 
 	if (pAd->FlgCfg80211Scanning == TRUE || 
 		RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_BSS_SCAN_IN_PROGRESS))
@@ -1537,19 +1537,6 @@ VOID CFG80211_UpdateAssocRespExtraIe(
     pAd->ApCfg.MBSSID[MAIN_MBSSID].AssocRespExtraIeLen = assocresp_ies_len;
 }
 
-const UCHAR *cfg80211_parsing_ie(UCHAR eid, const UCHAR *ies, UINT32 len)
-{
-	while (len > 2 && ies[0] != eid) {
-		len -= ies[1] + 2;
-		ies += ies[1] + 2;
-		}
-	if (len < 2)
-		return NULL;
-	if (len < 2 + ies[1])
-		return NULL;
-	return ies;
-}
-
 /* REF: ap_connect.c ApMakeBssBeacon */
 BOOLEAN CFG80211DRV_OpsBeaconSet(
     VOID                                            *pAdOrg,
@@ -1571,12 +1558,12 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 	const UCHAR WMM_OUI_TYPE = 0x2;
 #endif
 	PMULTISSID_STRUCT pMbss = &pAd->ApCfg.MBSSID[MAIN_MBSSID];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,33))
 	const UCHAR *ssid_ie = NULL;
 	const UCHAR *wpa_ie = NULL;
 	const UCHAR *rsn_ie = NULL;
 	const UCHAR *supp_rates_ie = NULL;
 	//const UCHAR *ext_supp_rates_ie = NULL;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 33))
 #ifdef DOT11_N_SUPPORT
 	UCHAR *ht_cap = NULL;
 #endif
@@ -1604,7 +1591,10 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 #ifdef RTMP_MAC_USB
 	UCHAR num_idx;
 #endif
-
+#ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
+    PUCHAR pVendorIE = NULL, pPreVendorIE = NULL;
+    UINT VendorIELen;
+#endif
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> CFG80211DRV_OpsBeaconSet ==> %d\n", isAdd));
 	pBeacon = (CMD_RTPRIV_IOCTL_80211_BEACON *)pData;
 
@@ -1674,7 +1664,7 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 #endif
 
 #ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
-	vendor_spec = cfg80211_find_ie(WLAN_EID_VENDOR_SPECIFIC, pBeacon->beacon_tail, pBeacon->beacon_tail_len);
+	vendor_spec = (UCHAR *)cfg80211_find_ie(WLAN_EID_VENDOR_SPECIFIC, pBeacon->beacon_tail, pBeacon->beacon_tail_len);
 #endif
 #ifdef DOT11_N_SUPPORT /*forced to enable short-GI*/
 	ht_cap = (UCHAR *)cfg80211_find_ie(WLAN_EID_HT_CAPABILITY, pBeacon->beacon_tail, pBeacon->beacon_tail_len);
@@ -1686,11 +1676,6 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 		}
 	}
 #endif
-#else
-	ssid_ie = cfg80211_parsing_ie(WLAN_EID_SSID, pBeacon->beacon_head+36, pBeacon->beacon_head_len-36);
-	supp_rates_ie = cfg80211_parsing_ie(WLAN_EID_SUPP_RATES, pBeacon->beacon_head+36, pBeacon->beacon_head_len-36);
-	wpa_ie = cfg80211_parsing_ie(WLAN_EID_WPA, pBeacon->beacon_tail, pBeacon->beacon_tail_len);
-	rsn_ie = cfg80211_parsing_ie(WLAN_EID_RSN, pBeacon->beacon_tail, pBeacon->beacon_tail_len);/*wpa2 case.*/
 #endif
 	/*1.SSID*/
 	NdisZeroMemory(pMbss->Ssid, pMbss->SsidLen);
@@ -1706,6 +1691,7 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 		NdisCopyMemory(pMbss->Ssid, ssid_ie+2, pMbss->SsidLen);
 		DBGPRINT(RT_DEBUG_TRACE,("CFG : SSID: %s, %d\n", pMbss->Ssid, pMbss->SsidLen));
 	}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 	if (pBeacon->hidden_ssid > 0 && pBeacon->hidden_ssid < 3) {
 		pMbss->bHideSsid = TRUE;
@@ -1730,17 +1716,17 @@ BOOLEAN CFG80211DRV_OpsBeaconSet(
 	{
 		DBGPRINT(RT_DEBUG_TRACE,("Remove P2P IE enter, lk added\n"));
 		
-		hex_dump("vendor_spec:", vendor_spec, 83);
+		hex_dump("vendor_spec:", (UCHAR*)vendor_spec, 83);
 		//Remove p2p IE
 		if (vendor_spec)
 		{			
 			DBGPRINT(RT_DEBUG_TRACE,("Remove P2P IE done, lk added\n"));
-			PUCHAR pVendorIE = NULL, pPreVendorIE = NULL;
-			UINT VendorIELen;
+	//		PUCHAR pVendorIE = NULL, pPreVendorIE = NULL;
+	//		UINT VendorIELen;
 			//Remove p2p capability
 			//pDest = strstr(vendor_spec, WIFIDIRECT_OUI);
 
-			pVendorIE = vendor_spec;
+			pVendorIE = (UCHAR*)vendor_spec;
 			while (pVendorIE < pBeacon->beacon_tail + pBeacon->beacon_tail_len)
 			{		
 				
@@ -3246,8 +3232,9 @@ VOID CFG80211_LostApInform(
 {
 
 	PRTMP_ADAPTER pAd = (PRTMP_ADAPTER)pAdCB;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0))
 	CFG80211_CB *p80211CB = pAd->pCfg80211_CB;
-	
+#endif
 	pAd->StaCfg.bAutoReconnect = FALSE;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0))
 	DBGPRINT(RT_DEBUG_TRACE, ("80211> CFG80211_LostApInform ==> %d\n", 
@@ -4209,6 +4196,129 @@ BOOLEAN CFG80211_checkScanTable(
 
 	return FALSE;
 }
+
+BOOLEAN CFG80211_checkStaScanTable(
+        IN VOID                                         *pAdCB)
+{
+    PRTMP_ADAPTER pAd = (PRTMP_ADAPTER)pAdCB;
+    CFG80211_CB *pCfg80211_CB  = (CFG80211_CB *)pAd->pCfg80211_CB;
+    struct wiphy *pWiphy = pCfg80211_CB->pCfg80211_Wdev->wiphy;
+    ULONG bss_idx = BSS_NOT_FOUND;
+    struct cfg80211_bss *bss;
+    struct ieee80211_channel *chan;
+    UINT32 CenFreq;
+    UINT64 timestamp;
+    struct timeval tv;
+    UCHAR *ie, ieLen = 0;
+    BOOLEAN isOk = FALSE;
+    PBSS_ENTRY pBssEntry;
+
+        if (MAC_ADDR_EQUAL(pAd->MlmeAux.Bssid, ZERO_MAC_ADDR))
+        {
+        CFG80211DBG(RT_DEBUG_ERROR, ("pAd->MlmeAux.Bssid ==> ZERO_MAC_ADDR\n"));
+        //ToDo: pAd->ApCfg.ApCliTab[0].CfgApCliBssid
+                return FALSE;
+        }
+
+    /* Fake TSF */
+    do_gettimeofday(&tv);
+    timestamp = ((UINT64)tv.tv_sec * 1000000) + tv.tv_usec;
+
+    bss = cfg80211_get_bss(pWiphy, NULL, pAd->MlmeAux.Bssid,
+                   pAd->MlmeAux.Ssid, pAd->MlmeAux.SsidLen,
+                   WLAN_CAPABILITY_ESS, WLAN_CAPABILITY_ESS);
+    if (bss)
+    {
+        DBGPRINT(RT_DEBUG_TRACE, ("Found %s in Kernel_ScanTable with CH[%d]\n", pAd->MlmeAux.Ssid, bss->channel->center_freq));
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+        cfg80211_put_bss(pWiphy, bss);
+#else
+        bss->tsf = timestamp;
+    cfg80211_put_bss(bss);
+#endif
+        return TRUE;
+    }
+    else
+    {
+        DBGPRINT(RT_DEBUG_ERROR, ("Can't Found %s in Kernel_ScanTable & Try Fake it\n", pAd->MlmeAux.Ssid));
+    }
+
+    bss_idx = BssSsidTableSearchBySSID(&pAd->ScanTab, pAd->MlmeAux.Ssid, pAd->MlmeAux.SsidLen);
+
+    if (bss_idx != BSS_NOT_FOUND)
+    {
+        /* Since the cfg80211 kernel scanTable not exist this Entry,
+         * Build an Entry for this connect inform event.  
+             */
+        if (bss_idx>=MAX_LEN_OF_BSS_TABLE)
+        {
+            ASSERT(0);
+            return FALSE;
+        }
+        pBssEntry = &pAd->ScanTab.BssEntry[bss_idx];
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+        if (pAd->ScanTab.BssEntry[bss_idx].Channel > 14)
+            CenFreq = ieee80211_channel_to_frequency(pBssEntry->Channel , IEEE80211_BAND_5GHZ);
+        else
+            CenFreq = ieee80211_channel_to_frequency(pBssEntry->Channel , IEEE80211_BAND_2GHZ);
+#else
+            CenFreq = ieee80211_channel_to_frequency(pBssEntry->Channel);
+#endif
+            chan = ieee80211_get_channel(pWiphy, CenFreq);
+
+        ieLen = 2 + pAd->MlmeAux.SsidLen + pBssEntry->VarIeFromProbeRspLen;
+
+        os_alloc_mem(NULL, (UCHAR **)&ie, ieLen);
+        if (!ie)
+        {
+            CFG80211DBG(RT_DEBUG_ERROR, ("Memory Allocate Fail in CFG80211_checkScanTable\n"));
+            return FALSE;
+        }
+
+        ie[0] = WLAN_EID_SSID;
+        ie[1] = pAd->MlmeAux.SsidLen;
+        NdisCopyMemory(ie + 2, pAd->MlmeAux.Ssid, pAd->MlmeAux.SsidLen);
+        NdisCopyMemory(ie + 2 + pAd->MlmeAux.SsidLen, pBssEntry->pVarIeFromProbRsp,
+                pBssEntry->VarIeFromProbeRspLen);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))  
+        bss = cfg80211_inform_bss(pWiphy, chan,CFG80211_BSS_FTYPE_UNKNOWN,
+                      pAd->MlmeAux.Bssid, timestamp, WLAN_CAPABILITY_ESS, pAd->MlmeAux.BeaconPeriod,
+                      ie, ieLen,
+                      (pBssEntry->AvgRssi * 100), GFP_KERNEL);
+#else
+        bss = cfg80211_inform_bss(pWiphy, chan,
+                      pAd->MlmeAux.Bssid, timestamp, WLAN_CAPABILITY_ESS, pAd->MlmeAux.BeaconPeriod,
+                      ie, ieLen,
+                      (pBssEntry->AvgRssi * 100), GFP_KERNEL);
+#endif
+        if (bss)
+        {
+            printk("Fake New %s(%02x:%02x:%02x:%02x:%02x:%02x) in Kernel_ScanTable with CH[%d][%d] BI:%d len:%d\n",
+                    pAd->MlmeAux.Ssid,
+                    PRINT_MAC(pAd->MlmeAux.Bssid),bss->channel->center_freq, pBssEntry->Channel,
+                    pAd->MlmeAux.BeaconPeriod, pBssEntry->VarIeFromProbeRspLen);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+            cfg80211_put_bss(pWiphy, bss);
+#else
+            cfg80211_put_bss(bss);
+#endif
+            isOk = TRUE;
+        }
+
+        if (ie != NULL)
+            os_free_mem(NULL, ie);
+
+        if (isOk)
+            return TRUE;
+    }
+    else
+        printk("%s Not In Driver Scan Table\n", pAd->MlmeAux.Ssid);
+
+    return FALSE;
+}
+
 VOID CFG80211_ParseBeaconIE(VOID *pAdOrg, VOID *pData,const UCHAR *wpa_ie,  const UCHAR *rsn_ie)
 {
 	//PRTMP_ADAPTER pAd = (PRTMP_ADAPTER)pAdOrg;

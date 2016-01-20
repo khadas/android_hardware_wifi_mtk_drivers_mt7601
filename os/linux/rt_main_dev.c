@@ -336,14 +336,17 @@ int rt28xx_open(VOID *dev)
 /*	if (RT_DEV_PRIV_FLAGS_GET(net_dev) == INT_MAIN) */
 	if (RTMP_DRIVER_MAIN_INF_CHECK(pAd, RT_DEV_PRIV_FLAGS_GET(net_dev)) == NDIS_STATUS_SUCCESS)
 	{
+#ifdef CONFIG_WEXT_CONF
 #ifdef CONFIG_APSTA_MIXED_SUPPORT
 		if (OpMode == OPMODE_AP)
 			net_dev->wireless_handlers = (struct iw_handler_def *) &rt28xx_ap_iw_handler_def;
 #endif /* CONFIG_APSTA_MIXED_SUPPORT */
+
 #ifdef CONFIG_STA_SUPPORT
 		if (OpMode == OPMODE_STA)
 			net_dev->wireless_handlers = (struct iw_handler_def *) &rt28xx_iw_handler_def;
 #endif /* CONFIG_STA_SUPPORT */
+#endif
 	}
 #endif /* WIRELESS_EXT >= 12 */
 

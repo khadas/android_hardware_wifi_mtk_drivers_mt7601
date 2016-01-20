@@ -7046,7 +7046,8 @@ VOID RTMPIoctlShow(
             wrq->u.data.length = strlen(extra) + 1; /* 1: size of '\0' */
             break;
         case SHOW_DRVIER_VERION:
-            snprintf(extra, size, "Driver version-%s, %s %s\n", STA_DRIVER_VERSION, __DATE__, __TIME__ );
+         //   snprintf(extra, size, "Driver version-%s, %s %s\n", STA_DRIVER_VERSION, __DATE__, __TIME__ );
+		//	snprintf(extra, size, "Driver version-%s,\n", STA_DRIVER_VERSION,);
             wrq->u.data.length = strlen(extra) + 1; /* 1: size of '\0' */
             break;
 #ifdef DOT11_N_SUPPORT
@@ -7537,7 +7538,6 @@ RtmpIoctl_rt_ioctl_siwscan(
 	RT_CMD_STA_IOCTL_SCAN *pConfig = (RT_CMD_STA_IOCTL_SCAN *)pData;
 	int Status = NDIS_STATUS_SUCCESS;
 
-
 #ifdef ANDROID_SUPPORT
 	if ((!RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_INTERRUPT_IN_USE))
 #ifdef IFUP_IN_PROBE
@@ -7571,7 +7571,7 @@ RtmpIoctl_rt_ioctl_siwscan(
 
     pAd->StaCfg.bSkipAutoScanConn = TRUE;
 	do{
-
+		
 		if ((OPSTATUS_TEST_FLAG(pAd, fOP_STATUS_MEDIA_STATE_CONNECTED)) &&
 			((pAd->StaCfg.AuthMode == Ndis802_11AuthModeWPA) || 
 				(pAd->StaCfg.AuthMode == Ndis802_11AuthModeWPAPSK) ||
@@ -7579,11 +7579,17 @@ RtmpIoctl_rt_ioctl_siwscan(
 				(pAd->StaCfg.AuthMode == Ndis802_11AuthModeWPA2PSK)) &&	
 			(pAd->StaCfg.PortSecured == WPA_802_1X_PORT_NOT_SECURED))
 		{
-			DBGPRINT(RT_DEBUG_TRACE, ("!!! Link UP, Port Not Secured! ignore this set::OID_802_11_BSSID_LIST_SCAN\n"));
+			DBGPRINT(RT_DEBUG_TRACE, ("!!! Link UP, Port Not Secured!ignore this set::OID_802_11_BSSID_LIST_SCAN\n"));
 			Status = NDIS_STATUS_SUCCESS;
+			
 			#ifdef RT_CFG80211_SUPPORT
 			RTEnqueueInternalCmd(pAd, CMDTHREAD_SCAN_END, NULL, 0);
 			#endif
+	//			RtmpOsMsDelay(4000);
+	//		DBGPRINT(RT_DEBUG_TRACE, ("please link down ,not pending it\n"));
+	//		LinkDown(pAd, FALSE);
+				
+
 			break;
 		}
 

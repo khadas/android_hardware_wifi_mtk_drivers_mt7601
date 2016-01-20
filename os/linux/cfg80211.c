@@ -274,14 +274,14 @@ Note:
 	};
 ========================================================================
 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32))
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
 static int CFG80211_OpsChannelSet(
 	IN struct wiphy					*pWiphy,
 	IN struct net_device			*pDev,
 	IN struct ieee80211_channel		*pChan,
 	IN enum nl80211_channel_type	ChannelType)
-#if 0
+#else
 static int CFG80211_OpsChannelSet(
 	IN struct wiphy					*pWiphy,
 	IN struct ieee80211_channel		*pChan,
@@ -337,8 +337,6 @@ static int CFG80211_OpsChannelSet(
 	return 0;
 } /* End of CFG80211_OpsChannelSet */
 #endif
-#endif
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)) 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)) 
 static int CFG80211_OpsMonitorChannelSet(struct wiphy *pWiphy,
@@ -2190,7 +2188,7 @@ static void CFG80211_OpsMgmtFrameRegister(
 	return;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
 static int CFG80211_OpsMgmtTx(
     IN struct wiphy *pWiphy,
     IN struct wireless_dev *pDev,
@@ -3008,7 +3006,7 @@ struct cfg80211_ops CFG80211_Ops = {
 #endif	/* LINUX_VERSION_CODE */
 
 	/* set channel for a given wireless interface */
-	//.set_channel				= CFG80211_OpsChannelSet,
+//	.set_channel				= CFG80211_OpsChannelSet,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)) 	
 	.set_monitor_channel			= CFG80211_OpsMonitorChannelSet,
 #endif

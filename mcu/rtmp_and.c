@@ -1061,6 +1061,7 @@ static VOID DFSDetectRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 
 static VOID PBFMonitorRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 {
+#if 0
 	if ((*Data) == 0) {
 		/* Low threshold happens */
 		DBGPRINT(RT_DEBUG_TRACE, ("%s::enable TX Queue\n", __FUNCTION__));
@@ -1075,6 +1076,7 @@ static VOID PBFMonitorRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 	}
 	else
 		DBGPRINT(RT_DEBUG_TRACE, ("%s::no this command(%d)\n", __FUNCTION__, *Data));
+#endif
 }
 
 

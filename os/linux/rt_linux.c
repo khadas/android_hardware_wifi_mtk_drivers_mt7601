@@ -54,7 +54,7 @@
 #define RT_CONFIG_IF_OPMODE_ON_STA(__OpMode)
 #endif
 
-ULONG RTDebugLevel = RT_DEBUG_ERROR;
+ULONG RTDebugLevel = 3;
 ULONG RTDebugFunc = 0;
 
 #ifdef OS_ABL_FUNC_SUPPORT
@@ -1506,8 +1506,9 @@ int RtmpOSWrielessEventSend(
 		wrqu.data.length = dataLen;
 	else
 		wrqu.data.length = 0;
-
+#ifdef CONFIG_WEXT_CONF
 	wireless_send_event(pNetDev, eventType, &wrqu, (char *)pData);
+#endif
 	return 0;
 }
 
@@ -1538,8 +1539,9 @@ int RtmpOSWrielessEventSendExt(
 		wrqu.data.length = dataLen;
 
 	wrqu.addr.sa_family = family;
-
+#ifdef CONFIG_WEXT_CONF
 	wireless_send_event(pNetDev, eventType, &wrqu, (char *)pData);
+#endif
 	return 0;
 }
 
@@ -1873,7 +1875,7 @@ int RtmpOSNetDevAttach(
 /*		pNetDev->get_wireless_stats = rt28xx_get_wireless_stats; */
 		pNetDev->get_wireless_stats = pDevOpHook->get_wstats;
 #endif
-
+#ifdef CONFIG_WIRELESS_EXT
 #ifdef CONFIG_STA_SUPPORT
 #if WIRELESS_EXT >= 12
 		if (OpMode == OPMODE_STA) {
@@ -1882,7 +1884,8 @@ int RtmpOSNetDevAttach(
 		}
 #endif /*WIRELESS_EXT >= 12 */
 #endif /* CONFIG_STA_SUPPORT */
-
+#endif
+#ifdef CONFIG_WIRELESS_EXT
 #ifdef CONFIG_APSTA_MIXED_SUPPORT
 #if WIRELESS_EXT >= 12
 		if (OpMode == OPMODE_AP) {
@@ -1891,7 +1894,7 @@ int RtmpOSNetDevAttach(
 		}
 #endif /*WIRELESS_EXT >= 12 */
 #endif /* CONFIG_APSTA_MIXED_SUPPORT */
-
+#endif
 		/* copy the net device mac address to the net_device structure. */
 		NdisMoveMemory(pNetDev->dev_addr, &pDevOpHook->devAddr[0],
 			       MAC_ADDR_LEN);
@@ -3342,12 +3345,8 @@ VOID CFG80211OS_Scaning(
 	UINT32 IdChan;
 	UINT32 CenFreq;
 	UINT CurBand;
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
-	struct timespec ts;
-	UINT64 bootTime = 0;
-#else
-	struct timeval tv;
-#endif
+        struct timespec ts;
+        UINT64 bootTime = 0;
 	struct wiphy *pWiphy = pCfg80211_CB->pCfg80211_Wdev->wiphy;
 	struct cfg80211_bss *bss = NULL;
 	struct ieee80211_mgmt *mgmt;
@@ -3390,18 +3389,12 @@ VOID CFG80211OS_Scaning(
 		/* CFG80211_SIGNAL_TYPE_MBM: signal strength in mBm (100*dBm) */
 		RSSI = RSSI * 100;  
 	}
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
+
 	get_monotonic_boottime(&ts);
 	bootTime = ts.tv_sec;
 	bootTime *= USEC_PER_SEC;
 	bootTime += ts.tv_nsec/NSEC_PER_USEC;
 	mgmt->u.probe_resp.timestamp  = bootTime;
-#else
-	if (!mgmt->u.probe_resp.timestamp) {
-		do_gettimeofday(&tv);
-		mgmt->u.probe_resp.timestamp = ((UINT64) tv.tv_sec * 1000000) + tv.tv_usec;
-	}
-#endif
 	
 	/* inform 80211 a scan is got */
 	/* we can use cfg80211_inform_bss in 2.6.31, it is easy more than the one */
@@ -3582,49 +3575,40 @@ BOOLEAN CFG80211OS_RxMgmt(IN PNET_DEV pNetDev, IN INT32 freq, IN PUCHAR frame, I
 		CFG80211DBG(RT_DEBUG_ERROR, ("%s: pNetDev == NULL\n", __FUNCTION__));
 		return FALSE;
 	}
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
-		return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
-									freq,
-									0,
-									frame,
-									len,
-									0);	
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
-		return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
-									freq,
-									0,
-									frame,
-									len,
-									GFP_ATOMIC);
-#else	
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0))
+    return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
+                                freq,
+                                0,       //CFG_TODO return 0 in dbm
+                                frame,
+                                len,
+                                0,
+                                GFP_ATOMIC);
+#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
+	return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr, freq, 0,frame,len,GFP_ATOMIC);//return 0 in dbm
+#else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
-		return cfg80211_rx_mgmt(pNetDev,
-					freq,
-					0,
-					frame,
-					len,
-					GFP_ATOMIC); 
+        return cfg80211_rx_mgmt(pNetDev, freq, 0, frame, len, GFP_ATOMIC);
 #else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
-			return cfg80211_rx_mgmt(pNetDev, freq, frame, len, GFP_ATOMIC);
-#else
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
-		return cfg80211_rx_action(pNetDev, freq, frame, len, GFP_ATOMIC);
+	return cfg80211_rx_action(pNetDev, freq, frame, len, GFP_ATOMIC);
 #else
-		return FALSE;
-#endif /* LINUX_VERSION_CODE: 2.6.34 */
-#endif /* LINUX_VERSION_CODE: 2.6.37 */
-#endif /* LINUX_VERSION_CODE: 3.4.0 */
-#endif /* LINUX_VERSION_CODE: 3.6.0 */
+	return FALSE;
+#endif /*2.6.34*/
+#endif /*2.6.37*/
+#endif /*3.4.0*/
+#endif
 
 }
 
 VOID CFG80211OS_TxStatus(IN PNET_DEV pNetDev, IN INT32 cookie, IN PUCHAR frame, IN UINT32 len, IN BOOLEAN ack)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)) 
         return cfg80211_mgmt_tx_status(pNetDev->ieee80211_ptr, cookie, frame, len, ack, GFP_ATOMIC);
 #else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 	return cfg80211_mgmt_tx_status(pNetDev, cookie, frame, len, ack, GFP_ATOMIC);
 #else
 

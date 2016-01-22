@@ -3551,8 +3551,8 @@ BOOLEAN RxDoneInterruptHandle(
 		{
 			NdisGetSystemUpTime(&Now);
 			pAd->StaCfg.LastBeaconRxTime = Now;
-			printk("CfgApCliBssid: %02x:%02x:%02x:%02x:%02x:%02x, %02x:%02x:%02x:%02x:%02x:%02x\n",
-				PRINT_MAC(pAd->CommonCfg.Bssid), PRINT_MAC(pHeader->Addr2));
+//			printk("CfgApCliBssid: %02x:%02x:%02x:%02x:%02x:%02x, %02x:%02x:%02x:%02x:%02x:%02x\n",
+//				PRINT_MAC(pAd->CommonCfg.Bssid), PRINT_MAC(pHeader->Addr2));
 		
 		}
 		if ( (pHeader->FC.Type == BTYPE_MGMT) && (pHeader->FC.SubType == SUBTYPE_DEAUTH) )

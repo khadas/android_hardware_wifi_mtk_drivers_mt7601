@@ -1,4 +1,5 @@
 
+#include "rt_config.h"
 #include <asm/uaccess.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
@@ -37,8 +38,16 @@ void evt_cb(unsigned int eid, struct msc_result *result)
 int msc_proc_create(void *priv)
 {
 	printk("MSC msc_proc_create: %p\n", priv);
-	if(entry == NULL)
+	if (entry == NULL) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 	entry = proc_create_data(MSC_PROC_NAME, S_IRUSR|S_IWUSR, NULL, &msc_proc_fops, priv);
+#else
+	entry = create_proc_entry(MSC_PROC_NAME, S_IRUGO, NULL);
+	if (!entry)
+		return -ENOMEM;
+	entry->proc_fops = &msc_proc_fops;
+#endif   /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)  */
+	}
 	
 	return 0;
 }

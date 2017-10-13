@@ -113,6 +113,9 @@ static void msc_core_evt_cbk(enum eevent_id eid)
 		if (msc_ctx.evt_cb)
 			msc_ctx.evt_cb(eid);
 		break;
+	case EVT_ID_TIMEOUT:
+		MSC_INFO("[MSC]receive pkt timeout.\n");
+		break;
 	default:
 		break;
 	}
@@ -149,8 +152,7 @@ static int chl_switch_thread(void *data)
 		sccb_set_monitor_chan(&chl_info, msc_ctx.priv);
 		msc_ctx.is_thread_run_to_end = 1;
 		osal_unlock(&msc_ctx.lock);
-	};
-
+		}
 	if ((msc_ctx.cur_chl != chl_info.chan_id) && (chl_info.chan_id != 0) &&  (msc_ctx.cur_chl != 0))
 	{
 		osal_msleep(100);
@@ -292,6 +294,7 @@ void msc_stop(void *priv)
 		osal_timer_stop(&msc_ctx.timer);
 #endif
 	}
+	elian_stop();
 	sccb_disable_input();
 
 	/*there is a problem if chl_switch_thread haven't finish "sccb_set_monitor_chan()" function.
@@ -322,7 +325,6 @@ void msc_stop(void *priv)
 
 int msc_get_result(struct msc_result *result)
 {
-#define MSC_RESULT_BUFFER_SIZE 256
 	char buffer[MSC_RESULT_BUFFER_SIZE] = {0};
 	int len;
 
@@ -375,11 +377,15 @@ int msc_set_chl(struct chan_info *chl, void *priv)
 
 int msc_cmd_handler(char *cmd, int len, char *result_str, void *priv)
 {
+	char *q = NULL;
+	int tmp_len = 0;
+	int chan_len = 0;
 	char *p = cmd;
 	struct msc_param para = {0};
 	struct msc_result result ={0};
 	struct chan_info chl_info;
 	int chl;
+	char result_str_temp[500];
 
 	if (cmd == NULL || result_str == NULL || priv == NULL)
 		return -1;
@@ -413,32 +419,45 @@ int msc_cmd_handler(char *cmd, int len, char *result_str, void *priv)
 		MSC_INFO("[MSC] AM=%d, ssid=%s, pwd=%s, user=%s, cust_data_len=%d, cust_data=%s,\n",
 				result.auth_mode, result.ssid, result.pwd, 
 				result.user, result.cust_data_len, result.cust_data);
-		sprintf(result_str, "AM=%d, ssid=%s, pwd=%s, user=%s, cust_data_len=%d, cust_data=%s,\n",
-				result.auth_mode, result.ssid, result.pwd, 
-				result.user, result.cust_data_len, result.cust_data);
+		sprintf(result_str_temp,
+			"AM=%d, ssid=%s, pwd=%s, user=%s, cust_data_len=%d, cust_data=%s,\n",
+			result.auth_mode, result.ssid, result.pwd,
+			result.user, result.cust_data_len, result.cust_data);
+		if (osal_strlen(result_str_temp) >= MSC_RESULT_BUFFER_SIZE)
+			MSC_INFO("Max result len is 128, Current len is [%d]\n",
+			osal_strlen(result_str_temp));
+		else
+			osal_memcpy(result_str, result_str_temp, osal_strlen(result_str_temp));
 	} else if (osal_strncmp(p, "set_ch=", 7) == 0) {
-
-		chl = (int)osal_strtol(p+7, NULL, 10);
-		chl_info.chan_id = chl;
-
-	 	if(osal_strstr(p, "bw=20")) {
-			chl_info.width = MSC_CHAN_WIDTH_20;
-		} else if (osal_strstr(p, "bw=40h")) {
-			chl_info.width = MSC_CHAN_WIDTH_40_PLUS;
-		} else if (osal_strstr(p, "bw=40l")) {
-			chl_info.width = MSC_CHAN_WIDTH_40_MINUS;
-		} else {
-			if (chl_info.chan_id >= 8  && chl_info.chan_id <= 14) {
+		q = osal_strstr(p, ",bw=");
+		if (q) {
+			/* find bw */
+			if (osal_strstr(p, "bw=20")) {
+				chl_info.width = MSC_CHAN_WIDTH_20;
+			} else if (osal_strstr(p, "bw=40h")) {
+				chl_info.width = MSC_CHAN_WIDTH_40_PLUS;
+			} else if (osal_strstr(p, "bw=40l")) {
 				chl_info.width = MSC_CHAN_WIDTH_40_MINUS;
 			} else {
-				chl_info.width = MSC_CHAN_WIDTH_40_PLUS;
+				if (chl_info.chan_id >= 8  && chl_info.chan_id <= 14)
+					chl_info.width = MSC_CHAN_WIDTH_40_MINUS;
+				else
+					chl_info.width = MSC_CHAN_WIDTH_40_PLUS;
 			}
-		}
-		chl_info.flags = 0x0;
-		if (msc_set_chl(&chl_info, priv)) {
-			osal_strcpy(result_str, "call start CMD first.");
+			/* find channel id */
+			tmp_len = osal_strlen(q);
+			chan_len = len-tmp_len-7;
+			chl = (int)osal_strtol(p+7, (char **)p+7+chan_len-1, 10);
+			chl_info.chan_id = chl;
+
+			chl_info.flags = 0x0;
+			if (msc_set_chl(&chl_info, priv))
+				osal_strcpy(result_str, "call start CMD first.");
+			else
+				osal_strcpy(result_str, "ok");
 		} else {
-			osal_strcpy(result_str, "ok");
+			MSC_WARN("Command Format: set_ch=xx,bw=yyy\n");
+			MSC_WARN("xx-->channel id\nyyy-->20/40l/40h\n");
 		}
 	} else {
 		osal_strcpy(result_str, "unknown CMD.");

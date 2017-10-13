@@ -114,6 +114,9 @@ typedef struct _UAPSD_INFO {
 #include "rt_ate.h"
 #endif /* RALINK_ATE */
 
+#ifndef NL80211_HIDDEN_SSID_NOT_IN_USE
+#define NL80211_HIDDEN_SSID_NOT_IN_USE 0
+#endif
 
 /*#define DBG		1 */
 
@@ -307,6 +310,13 @@ void DisplayTxAgg (RTMP_ADAPTER *pAd);
 #define RTMP_CLEAR_FLAGS(_M)        ((_M)->Flags = 0)
 #define RTMP_TEST_FLAG(_M, _F)      (((_M)->Flags & (_F)) != 0)
 #define RTMP_TEST_FLAGS(_M, _F)     (((_M)->Flags & (_F)) == (_F))
+
+#define RTMP_SET_EXT_FLAG(_M, _F)       ((_M)->ext_flags |= (_F))
+#define RTMP_CLEAR_EXT_FLAG(_M, _F)     ((_M)->ext_flags &= ~(_F))
+#define RTMP_CLEAR_EXT_FLAGS(_M)        ((_M)->ext_flags = 0)
+#define RTMP_TEST_EXT_FLAG(_M, _F)      (((_M)->ext_flags & (_F)) != 0)
+#define RTMP_TEST_EXT_FLAGS(_M, _F)     (((_M)->ext_flags & (_F)) == (_F))
+
 /* Macro for power save flag. */
 #define RTMP_SET_PSFLAG(_M, _F)       ((_M)->PSFlags |= (_F))
 #define RTMP_CLEAR_PSFLAG(_M, _F)     ((_M)->PSFlags &= ~(_F))
@@ -334,6 +344,10 @@ void DisplayTxAgg (RTMP_ADAPTER *pAd);
 #define IS_ASIC_CAP(_pAd, _caps)			(((_pAd)->chipCap.asic_caps & (_caps)) != 0)
 #define CLR_ASIC_CAP(_pAd, _caps)		((_pAd)->chipCap.asic_caps &= ~(_caps))
 
+#define RTMP_SET_SUSPEND_FLAG(_M, _F)       ((_M)->SuspendFlags |= (_F))
+#define RTMP_CLEAR_SUSPEND_FLAG(_M, _F)     ((_M)->SuspendFlags &= ~(_F))
+#define RTMP_TEST_SUSPEND_FLAG(_M, _F)      (((_M)->SuspendFlags & (_F)) != 0)
+#define RTMP_TEST_SUSPEND_FLAGS(_M, _F)     (((_M)->SuspendFlags & (_F)) == (_F))
 
 #ifdef CONFIG_STA_SUPPORT
 #define STA_NO_SECURITY_ON(_p)          (_p->StaCfg.WepStatus == Ndis802_11EncryptionDisabled)
@@ -1520,7 +1534,11 @@ typedef struct _MULTISSID_STRUCT {
 	/* TXWI_STRUC *BeaconTxWI; */
 	CHAR BeaconBuf[MAX_BEACON_SIZE];	/* NOTE: BeaconBuf should be 4-byte aligned */
 
-	BOOLEAN bHideSsid;
+	UCHAR hidden_ssid;	/* Sync with nl80211_hidden_ssid enum
+				0: hidden SSID not in use,
+				1: zero len,
+				2: zero contents
+				*/
 	UINT16 StationKeepAliveTime;	/* unit: second */
 
 	/* VLAN related */
@@ -3459,9 +3477,13 @@ typedef struct _WOW_CFG_STRUCT {
 	BOOLEAN			bEnable;		/* Enable WOW function*/
 	BOOLEAN			bWOWFirmware;	/* Enable WOW function, trigger to reload WOW-support firmware */
 	BOOLEAN			bInBand;		/* use in-band signal to wakeup system */
+	BOOLEAN			bInSuspendMode;	/* Now in suspend mode or not */
 	UINT8			nSelectedGPIO;	/* Side band signal to wake up system */
 	UINT8			nDelay;			/* Delay number is multiple of 3 secs, and it used to postpone the WOW function */
 	UINT8           nHoldTime;      /* GPIO puls hold time, unit: 10ms */
+	UCHAR			PTK[64];		/* Store the PTK for rekey */
+	UCHAR			ReplayCounter[LEN_KEY_DESC_REPLAY]; /* Store the replay
+								     counter for rekey */
 } WOW_CFG_STRUCT, *PWOW_CFG_STRUCT;
 #endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */
 
@@ -3480,7 +3502,8 @@ typedef enum {
 typedef enum {
 	WOW_ENABLE = 1,
 	WOW_TRAFFIC = 3,
-	WOW_WAKEUP = 4
+	WOW_WAKEUP = 4,
+	WOW_USB_INTERRUPT = 5
 } WOW_FEATURE_T;
 
 typedef enum {
@@ -3489,6 +3512,17 @@ typedef enum {
 	WOW_INFRA_CFG,
 	WOW_P2P_CFG,
 } WOW_CONFIG_T;
+
+enum {
+	WOW_NOT_IN_SUSPEND,
+	WOW_IN_SUSPENDING,
+	WOW_SUSPEND_COMPLETE,
+};
+
+enum {
+	WOW_ENABLE_USB_INTERRUPT,
+	WOW_DISABLE_USB_INTERRUPT
+};
 
 enum {
 	WOW_MAGIC_PKT,
@@ -3511,7 +3545,7 @@ typedef struct NEW_WOW_SEC_CFG_STRUCT {
 	UCHAR 	R_COUNTER[8];
 	UCHAR 	Key_Id;
 	UCHAR 	Cipher_Alg;
-	UCHAR 	WCID;
+	UCHAR	Aid;
 	UCHAR 	Group_Cipher;
 } NEW_WOW_SEC_CFG_STRUCT, PNEW_WOW_SEC_CFG_STRUCT;
 
@@ -3560,7 +3594,7 @@ typedef enum{
 	PKT_INVALID_PKT_MIC = 17 << 8,
 	
 	PKT_PORT_NOT_SECURE = 18 << 8,
-	PKT_TSPEC_NO_MATCH  = 19 << 8,
+	PKT_TSPEC_NO_MATCH = 19 << 8,
 	PKT_NO_ASSOCED_STA = 20 << 8,
 	PKT_INVALID_MAC_ENTRY = 21 << 8,
 	
@@ -4157,8 +4191,11 @@ struct _RTMP_ADAPTER {
 
 	/* flags, see fRTMP_ADAPTER_xxx flags */
 	ULONG Flags;		/* Represent current device status */
+	ULONG ext_flags;
 	ULONG PSFlags;		/* Power Save operation flag. */
 	ULONG MoreFlags;	/* Represent specific requirement */
+
+	ULONG SuspendFlags;	/* Flags used for suspend state */
 
 	/* current TX sequence # */
 	USHORT Sequence;
@@ -4494,6 +4531,33 @@ struct _RTMP_ADAPTER {
 	UCHAR					P2PCurrentAddress[MAC_ADDR_LEN];	  /* User changed MAC address */
 	PNET_DEV				p2p_dev;
 #endif /* P2P_SUPPORT */
+
+#ifdef ED_MONITOR
+	BOOLEAN ed_chk;
+	UCHAR ed_threshold;
+	UINT ed_block_tx_threshold;
+	INT ed_chk_period;  /* in unit of ms*/
+
+	UCHAR ed_stat_sidx;
+	UCHAR ed_stat_lidx;
+	BOOLEAN ed_tx_stopped;
+	UINT ed_trigger_cnt;
+	UINT ed_silent_cnt;
+	UINT ed_false_cca_cnt;
+
+#define ED_STAT_CNT 20
+	UINT32 ed_stat[ED_STAT_CNT];
+	UINT32 ed_trigger_stat[ED_STAT_CNT];
+	UINT32 ed_silent_stat[ED_STAT_CNT];
+	UINT32 ed_2nd_stat[ED_STAT_CNT];
+	UINT32 ch_idle_stat[ED_STAT_CNT];
+	UINT32 ch_busy_stat[ED_STAT_CNT];
+	UINT32 false_cca_stat[ED_STAT_CNT];
+	ULONG chk_time[ED_STAT_CNT];
+	RALINK_TIMER_STRUCT ed_timer;
+	BOOLEAN ed_timer_inited;
+#endif /* ED_MONITOR */
+
 #if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
 	WOW_CFG_STRUCT WOW_Cfg; /* data structure for wake on wireless */
 #endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */
@@ -4543,6 +4607,13 @@ struct _RTMP_ADAPTER {
 #endif /* SINGLE_SKU_V2 */
 
 };
+
+#ifdef ED_MONITOR
+INT edcca_tx_stop_start(RTMP_ADAPTER *pAd, BOOLEAN stop);
+INT ed_status_read(RTMP_ADAPTER *pAd);
+INT ed_monitor_init(RTMP_ADAPTER *pAd);
+INT ed_monitor_exit(RTMP_ADAPTER *pAd);
+#endif /* ED_MONITOR */
 
 #if defined(RTMP_INTERNAL_TX_ALC) || defined(RTMP_TEMPERATURE_COMPENSATION) 
 /* The offset of the Tx power tuning entry (zero-based array) */
@@ -6077,6 +6148,12 @@ ULONG BssTableSearch(
 	IN BSS_TABLE *Tab, 
 	IN PUCHAR pBssid,
 	IN UCHAR Channel);
+
+#ifdef ED_MONITOR
+ULONG BssChannelAPCount(
+IN BSS_TABLE * Tab,
+IN UCHAR Channel);
+#endif /* ED_MONITOR */
 
 ULONG BssSsidTableSearch(
 	IN BSS_TABLE *Tab, 
@@ -8517,6 +8594,11 @@ INT Set_MBSS_WirelessMode_Proc(
 INT Set_Channel_Proc(
 	IN	PRTMP_ADAPTER	pAd, 
 	IN	PSTRING			arg);
+
+INT Set_Monitor_Channel_And_Bw(
+	IN	PRTMP_ADAPTER	pAd,
+	IN	PSTRING			arg);
+
 INT	Set_ShortSlot_Proc(
 	IN	PRTMP_ADAPTER	pAd,
 	IN	PSTRING			arg);

@@ -1261,6 +1261,63 @@ VOID MT7601_ChipAGCInit(
 
 }
 
+#if 0 /*Old MT7601_set_ed_cca*/
+#ifdef ED_MONITOR
+INT MT7601_set_ed_cca(RTMP_ADAPTER *pAd, BOOLEAN enable)
+{
+	UINT32 mac_val;
+	UCHAR bbp_val;
+
+	if (enable) {
+		RTMP_IO_READ32(pAd, CH_TIME_CFG, &mac_val);
+		mac_val |= 0x05; /* enable channel status check */
+		RTMP_IO_WRITE32(pAd, CH_TIME_CFG, mac_val);
+
+		/* BBP: enable ED_CCA and high/low threshold */
+		bbp_val = 0x01; /* 0x2e */ /* bit 0~7 for high threshold */
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R61, bbp_val);
+
+		RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R87, &bbp_val);
+		bbp_val |= 0x80; /*0x84*/ /* bit 7 for enable ED_CCA */
+		bbp_val &= (~0x7); /* bit 0~2 for low threshold, set as 0 */
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R87, bbp_val);
+
+		/* BBP: enable ED_2nd_CCA and and threshold*/
+		/*bbp_val = 0x9a;*/ /* bit 0~3 for threshold*/
+		/*RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R83, bbp_val);*/
+
+		/*RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R65, &bbp_val);*/
+		/*bbp_val &= (~0x02);*/ /* bit 1 for eanble/disable ED_2nd_CCA, 0: enable, 1: disable */
+		//RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R65, bbp_val);
+
+		/* MAC: enable ED_CCA/ED_2nd_CCA*/
+		RTMP_IO_READ32(pAd, TXOP_CTRL_CFG, &mac_val);
+		mac_val |= ((1<<20) | (1<<7));
+		RTMP_IO_WRITE32(pAd, TXOP_CTRL_CFG, mac_val);
+	}else{
+		RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R87, &bbp_val);
+		bbp_val &= (~0x80); /* bit 7 for enable/disable ED_CCA */
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R87, bbp_val);
+
+		/*RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R65, &bbp_val);*/
+		/*bbp_val |= (0x02);*/ /* bit 1 for eanble/disable ED_2nd_CCA, 0: enable, 1: disable */
+		/*RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R65, bbp_val);*/
+
+		RTMP_IO_READ32(pAd, TXOP_CTRL_CFG, &mac_val);
+		mac_val &= (~((1<<20) | (1<<7)));
+		RTMP_IO_WRITE32(pAd, TXOP_CTRL_CFG, mac_val);		
+	}
+
+	/* Clear previous status */
+	RTMP_IO_READ32(pAd, CH_IDLE_STA, &mac_val);
+	RTMP_IO_READ32(pAd, CH_BUSY_STA, &mac_val);
+	RTMP_IO_READ32(pAd, CH_BUSY_STA_SEC, &mac_val);
+	RTMP_IO_READ32(pAd, 0x1140, &mac_val);
+
+	return TRUE;
+}
+#endif /* ED_MONITOR */
+#endif
 
 static VOID MT7601_ChipSwitchChannel(
 	struct _RTMP_ADAPTER *pAd,
@@ -1477,9 +1534,87 @@ static VOID MT7601_ChipSwitchChannel(
 		UpdateSkuRatePwr(pAd, Channel, pAd->CommonCfg.BBPCurrentBW, SkuBasePwr);
 #endif /* SINGLE_SKU_V2 */	
 
+#ifdef ED_MONITOR
+    /* let country code deside wherether need edcca or not */
+#if 0
+	MT7601_set_ed_cca(pAd, TRUE);
+#endif
+#endif /* ED_MONITOR */
 
 }
 
+#ifdef ED_MONITOR
+/* Sync from DPA_MT7601U_LinuxSTA_3.0.0.4_20130916_formal_EDCCA_test_2014-03-04_1727.diff */
+VOID MT7601_set_ed_cca(RTMP_ADAPTER *pAd, BOOLEAN enable)
+{
+	UINT32 mac_val;
+	UCHAR bbp_val;
+
+	/*DBGPRINT(RT_DEBUG_OFF, ("@@@ MT7601_set_ed_cca = %d\n", enable));*/
+	if (enable) {
+		RTMP_IO_READ32(pAd, CH_TIME_CFG, &mac_val);
+		mac_val |= 0x05; /* enable channel status check*/
+		RTMP_IO_WRITE32(pAd, CH_TIME_CFG, mac_val);
+	#ifdef WLAN_PANASONIC_CONFIG
+		/* BBP: enable ED_CCA and high/low threshold*/
+		/*Because Panasonic BDP have HDMI nosie ,We set BBP61=0x4 could filter the HDMI nosie.*/
+		bbp_val = 0x04; /* 0x08 *//*0x0B*/ /* 0x2e */ /* bit 0~7 for high threshold*/
+	#else 
+		/*BBP: enable ED_CCA and high/low threshold*/
+		bbp_val = 0x01; /* 0x08 *//*0x0B*/ /* 0x2e */ /*bit 0~7 for high threshold*/
+	#endif
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R61, bbp_val);
+
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R87, 0x87);
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R123, 0x03);
+
+		/* MAC: enable ED_CCA/ED_2nd_CCA*/
+		RTMP_IO_READ32(pAd, TXOP_CTRL_CFG, &mac_val);
+		mac_val |= ((1<<20) | (1<<7));
+		RTMP_IO_WRITE32(pAd, TXOP_CTRL_CFG, mac_val);
+	}else{
+		RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R87, &bbp_val);
+		bbp_val &= (~0x80); /* bit 7 for enable/disable ED_CCA*/
+		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R87, bbp_val);
+
+		RTMP_IO_READ32(pAd, TXOP_CTRL_CFG, &mac_val);
+		mac_val &= (~((1<<20) | (1<<7)));
+		RTMP_IO_WRITE32(pAd, TXOP_CTRL_CFG, mac_val);
+}
+
+	/* Clear previous status */
+	RTMP_IO_READ32(pAd, CH_IDLE_STA, &mac_val);
+	RTMP_IO_READ32(pAd, CH_BUSY_STA, &mac_val);
+	RTMP_IO_READ32(pAd, CH_BUSY_STA_SEC, &mac_val);
+	RTMP_IO_READ32(pAd, 0x1140, &mac_val);
+
+	return;
+}
+
+VOID MT7601_dynamic_set_ed_th(RTMP_ADAPTER *pAd, UINT BW, INT R66)
+{
+	UINT ed_th[2][17] = {{0x28, 0x26, 0x26, 0x24, 0x20, 0x1e, 0x1c, 0x16,
+					      0x12, 0x0e, 0x0a, 0xc06, 0x04, 0x02, 0x01, 0x01,
+					      0x01},
+					      {0x12, 0x12, 0x10, 0x10, 0x10, 0x10, 0x10, 0x0e,
+					      0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x01, 0x01,
+					      0x01}
+					    };
+	UINT index = 0;
+
+	if (BW > 1)
+		DBGPRINT(RT_DEBUG_TRACE, ("%s: invalid BW %u\n", __func__, BW));
+	if (R66 < 0x14 || R66 > 0x54)
+		DBGPRINT(RT_DEBUG_TRACE, ("%s: invalid BBP_R66 %d\n", __func__, R66));
+	index = (R66 - 0x14)/4;
+
+	if (index > 16)
+		DBGPRINT(RT_DEBUG_TRACE, ("%s: invalid index %u, BBP_R66 %d\n",
+			__func__, index, R66));
+
+	RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R61, ed_th[BW][index]);
+}
+#endif /* ED_MONITOR */
 
 NTSTATUS MT7601DisableTxRx(
 	RTMP_ADAPTER *pAd,
@@ -2800,8 +2935,6 @@ BOOLEAN MT7601_GetTemperatureCompensationParam(
 	RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R47, &BBPReg);	
 	if(BBPReg & 0x10)
 	{
-		printk("#\n");
-
 		return FALSE;
 	}
 #endif
@@ -3064,7 +3197,13 @@ VOID MT7601_AsicTxAlcGetAutoAgcOffset(
 #ifdef MT7601FPGA
 	return;
 #endif /*MT7601FPGA */
-
+	DBGPRINT(RT_DEBUG_TRACE, ("Start TxAlcGetAutoAgcOffset\n"));
+#ifdef ED_MONITOR
+	if (pAd->ed_tx_stopped == TRUE) {
+		DBGPRINT(RT_DEBUG_TRACE, ("edcca stop tx and exit TxAlcGetAutoOffset\n"));
+		return;
+	}
+#endif /* ED_MONITOR */
 	if ( pAd->TxPowerCtrl.bInternalTxALC == FALSE )
 		return;
 
@@ -3472,6 +3611,10 @@ VOID MT7601_Init(RTMP_ADAPTER *pAd)
 
 	pChipOps->AsicExtraPowerOverMAC = MT7601_AsicExtraPowerOverMAC;
 
+#ifdef ED_MONITOR
+	pChipOps->ChipSetEDCCA = MT7601_set_ed_cca;
+#endif /* ED_MONITOR */
+
 	pChipOps->DisableTxRx = MT7601DisableTxRx;
 
 #ifdef RTMP_USB_SUPPORT
@@ -3868,8 +4011,8 @@ Note:
   UCHAR         pre_R75_Value = 0x0;
   UCHAR         pre_R76_Value = 0x0;
   //UCHAR         debug_value = 0x0;
+  //ULONG         per=0;
 
-  ULONG Now32;
   INT16 BW20_RSSI_THR0 = pAd->CommonCfg.Bw20RssiThr0; //Default: -36dBm(BW_20)
   INT16 BW20_RSSI_THR1 = pAd->CommonCfg.Bw20RssiThr1; //Default: -50dBm(BW_20)
   INT16 BW20_RSSI_THR2 = pAd->CommonCfg.Bw20RssiThr2; //Default: -75dBm(BW_20)
@@ -3882,19 +4025,6 @@ Note:
   /*0. Dynamic vga is disable*/
   if(!pAd->CommonCfg.bDynaPDEnable)
     return;
-#ifdef ED_MONITOR
-    /*1. When use pd cca, cannot use ed cca simultaneous */
-    if (pAd->ed_chk)
-      return;
-#endif /*ED_MONITOR*/
-
-#if 0
-#ifdef ANT_DIVERSITY_SUPPORT
-  /*2. should not disable antnna diversity*/
-  if (pAd->CommonCfg.RxAntDiversityCfg == ANT_DIVERSITY_DISABLE)
-    return;
-#endif /*ANT_DIVERSITY_SUPPORT*/
-#endif
 
   /*3. should have antnna diversity*/
   rssi = MT7601_get_rssi(pAd);
@@ -3908,12 +4038,8 @@ Note:
   {
   	DBGPRINT(RT_DEBUG_TRACE, ("No connection! Set fake rssi= -80!!!\n"));
   	rssi = -80;
-  }
-  NdisGetSystemUpTime(&Now32);
-  if (RTMP_TIME_AFTER(Now32, pAd->StaCfg.LastBeaconRxTime + 1000) && OPSTATUS_TEST_FLAG(pAd, fOP_STATUS_MEDIA_STATE_CONNECTED)) {
-	DBGPRINT(RT_DEBUG_TRACE, ("beacon lose >1000ms ! Set fake rssi= -80!!!\n"));
-	rssi = -80;
-  }
+  } 
+
   if (!rssi|| !init_main_vga || !init_aux_vga)
   {
     DBGPRINT(RT_DEBUG_TRACE, ("!!![%s]rssi or init_vga is 0!!!\n",__FUNCTION__));
@@ -3926,6 +4052,11 @@ Note:
   {	
   	if (pAd->CommonCfg.Channel == pAd->CommonCfg.CentralChannel) //BW_20
   	{
+#ifdef ED_MONITOR
+		if (pAd->ed_chk && rssi >= BW20_RSSI_THR2)
+			rssi = BW20_RSSI_THR2;
+#endif /* ED_MONITOR */
+
 	      /*get default rssi_thr*/  
 	      if (rssi >= BW20_RSSI_THR0)// RSSI > -36
 	      {
@@ -4005,6 +4136,11 @@ Note:
   	}
 	else//BW_40
 	{
+#ifdef ED_MONITOR
+		if (pAd->ed_chk && rssi >= BW40_RSSI_THR2)
+			rssi = BW40_RSSI_THR2;
+#endif /* ED_MONITOR */
+
 		/*get default rssi_thr*/  
 	      if (rssi >= BW40_RSSI_THR0)// RSSI > -35
 	      {
@@ -4137,6 +4273,11 @@ Note:
   {
     RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R66, init_main_vga);
     rtmp_bbp_set_agc (pAd, init_main_vga, RX_CHAIN_ALL);
+#ifdef ED_MONITOR
+	if (pAd->ed_chk)
+		MT7601_dynamic_set_ed_th(pAd, pAd->CommonCfg.BBPCurrentBW,
+			init_main_vga);
+#endif /* ED_MONITOR */
   }
 
   /*AGC_R135*/

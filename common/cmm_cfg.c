@@ -956,7 +956,10 @@ INT RTMP_COM_IoctlHandle(
 		case CMD_RTPRIV_IOCTL_ADAPTER_RT28XX_USB_ASICRADIO_OFF:
 		/* RT28xxUsbAsicRadioOff */
 			//RT28xxUsbAsicRadioOff(pAd);
-			ASIC_RADIO_OFF(pAd, SUSPEND_RADIO_OFF);
+			if ((!RTMP_TEST_EXT_FLAG(pAd, fRTMP_ADAPTER_EXT_INIT_ONGOING)) &&
+				RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_START_UP)) {
+				ASIC_RADIO_OFF(pAd, SUSPEND_RADIO_OFF);
+			}
 			break;
 
 		case CMD_RTPRIV_IOCTL_ADAPTER_RT28XX_USB_ASICRADIO_ON:
@@ -1586,6 +1589,15 @@ INT RTMP_COM_IoctlHandle(
 			break;
 #endif /* defined(CONFIG_CSO_SUPPORT) || defined(CONFIG_RX_CSO_SUPPORT) */
 
+		case CMD_RTPRIV_IOCTL_SET_INIT_FLAG:
+			if (Data == 0) {
+				RTMP_CLEAR_EXT_FLAG(pAd,
+					fRTMP_ADAPTER_EXT_INIT_ONGOING);
+			} else if (Data == 1) {
+				RTMP_SET_EXT_FLAG(pAd,
+					fRTMP_ADAPTER_EXT_INIT_ONGOING);
+			}
+			break;
 	}
 
 #ifdef RT_CFG80211_SUPPORT

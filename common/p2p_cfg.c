@@ -4085,29 +4085,21 @@ INT	Set_HideSSID_Proc(
 	IN	PRTMP_ADAPTER	pAd, 
 	IN	PSTRING			arg)
 {
-	BOOLEAN bHideSsid;
 	POS_COOKIE pObj = (POS_COOKIE) pAd->OS_Cookie;
 
-	bHideSsid = simple_strtol(arg, 0, 10);
-
-	if (bHideSsid == 1)
-		bHideSsid = TRUE;
-	else if (bHideSsid == 0)
-		bHideSsid = FALSE;
-	else
-		return FALSE;  /*Invalid argument */
-	
-	if (pAd->ApCfg.MBSSID[pObj->ioctl_if].bHideSsid != bHideSsid)
-	{
-		pAd->ApCfg.MBSSID[pObj->ioctl_if].bHideSsid = bHideSsid;
-	}
+	pAd->ApCfg.MBSSID[pObj->ioctl_if].hidden_ssid = simple_strtol(arg, 0, 10);
 
 #ifdef WSC_V2_SUPPORT
-	if (pAd->ApCfg.MBSSID[pObj->ioctl_if].WscControl.WscV2Info.bEnableWpsV2)
-		WscOnOff(pAd, pObj->ioctl_if, pAd->ApCfg.MBSSID[pObj->ioctl_if].bHideSsid);
+	if (pAd->ApCfg.MBSSID[pObj->ioctl_if].WscControl.WscV2Info.bEnableWpsV2) {
+		if (pAd->ApCfg.MBSSID[pObj->ioctl_if].hidden_ssid == 0)
+			WscOnOff(pAd, pObj->ioctl_if, FALSE);
+		else
+			WscOnOff(pAd, pObj->ioctl_if, TRUE);
+	}
 #endif /* WSC_V2_SUPPORT */
 
-	DBGPRINT(RT_DEBUG_TRACE, ("IF(ra%d) Set_HideSSID_Proc::(HideSSID=%d)\n", pObj->ioctl_if, pAd->ApCfg.MBSSID[pObj->ioctl_if].bHideSsid));
+	DBGPRINT(RT_DEBUG_TRACE, ("IF(ra%d) Set_HideSSID_Proc::(HideSSID=%d)\n",
+		pObj->ioctl_if, pAd->ApCfg.MBSSID[pObj->ioctl_if].hidden_ssid));
 
 	return TRUE;
 }
@@ -8893,7 +8885,7 @@ INT	Set_WscV2Support_Proc(
 	POS_COOKIE	pObj = (POS_COOKIE) pAd->OS_Cookie;
 	UCHAR		bEnable = (UCHAR)simple_strtol(arg, 0, 10);
 	PWSC_CTRL	pWscControl = &pAd->ApCfg.MBSSID[pObj->ioctl_if].WscControl;
-	INT 		IsAPConfigured = pWscControl->WscConfStatus;		
+//	INT 		IsAPConfigured = pWscControl->WscConfStatus;		
 
 	if (bEnable == 0)
 		pWscControl->WscV2Info.bEnableWpsV2 = FALSE;
@@ -8907,7 +8899,7 @@ INT	Set_WscV2Support_Proc(
 		*/
 		if ((pAd->ApCfg.MBSSID[pObj->ioctl_if].WepStatus == Ndis802_11WEPEnabled) || 
 			(pAd->ApCfg.MBSSID[pObj->ioctl_if].WepStatus == Ndis802_11Encryption2Enabled) ||
-			(pAd->ApCfg.MBSSID[pObj->ioctl_if].bHideSsid))
+			(pAd->ApCfg.MBSSID[pObj->ioctl_if].hidden_ssid))
 			WscOnOff(pAd, pObj->ioctl_if | MIN_NET_DEVICE_FOR_P2P_GO, TRUE);
 		else
 			WscOnOff(pAd, pObj->ioctl_if | MIN_NET_DEVICE_FOR_P2P_GO, FALSE);

@@ -24,6 +24,30 @@
 
 #include <linux/ieee80211.h>
 
+#ifdef CFG_CFG80211_VERSION
+#define CFG80211_VERSION_CODE CFG_CFG80211_VERSION
+#else
+#define CFG80211_VERSION_CODE LINUX_VERSION_CODE
+#endif
+
+#if KERNEL_VERSION(4, 7, 0) <= CFG80211_VERSION_CODE
+/**
+ * enum nl80211_band - Frequency band
+ * @NL80211_BAND_2GHZ: 2.4 GHz ISM band
+ * @NL80211_BAND_5GHZ: around 5 GHz band (4.9 - 5.7 GHz)
+ * @NL80211_BAND_60GHZ: around 60 GHz band (58.32 - 64.80 GHz)
+ * @NUM_NL80211_BANDS: number of bands, avoid using this in userspace
+ *	 since newer kernel versions may support more bands
+ */
+#define KAL_BAND_2GHZ NL80211_BAND_2GHZ
+#define KAL_BAND_5GHZ NL80211_BAND_5GHZ
+#define KAL_NUM_BANDS NUM_NL80211_BANDS
+#else
+#define KAL_BAND_2GHZ IEEE80211_BAND_2GHZ
+#define KAL_BAND_5GHZ IEEE80211_BAND_5GHZ
+#define KAL_NUM_BANDS IEEE80211_NUM_BANDS
+#endif
+
 typedef enum _NDIS_HOSTAPD_STATUS {
 	Hostapd_Diable = 0,
 	Hostapd_EXT,
@@ -33,7 +57,7 @@ typedef enum _NDIS_HOSTAPD_STATUS {
 typedef struct __CFG80211_CB {
 
 	/* we can change channel/rate information on the fly so we backup them */
-	struct ieee80211_supported_band Cfg80211_bands[IEEE80211_NUM_BANDS];
+	struct ieee80211_supported_band Cfg80211_bands[KAL_NUM_BANDS];
 	struct ieee80211_channel *pCfg80211_Channels;
 	struct ieee80211_rate *pCfg80211_Rates;
 
@@ -84,6 +108,47 @@ BOOLEAN CFG80211_Register(
 	struct device				*pDev,
 	struct net_device			*pNetDev);
 
+/**
+ * kalCfg80211ScanDone - abstraction of cfg80211_scan_done
+ *
+ * @request: the corresponding scan request (sanity checked by callers!)
+ * @aborted: set to true if the scan was aborted for any reason,
+ *	userspace will be notified of that
+ *
+ * Since linux-4.8.y the 2nd parameter is changed from bool to
+ * struct cfg80211_scan_info, but we don't use all fields yet.
+ */
+#if KERNEL_VERSION(4, 8, 0) <= CFG80211_VERSION_CODE
+static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
+				       bool aborted)
+{
+	struct cfg80211_scan_info info = { .aborted = aborted };
+
+	cfg80211_scan_done(request, &info);
+}
+#else
+static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
+				       bool aborted)
+{
+	cfg80211_scan_done(request, aborted);
+}
+#endif
+
+#if KERNEL_VERSION(4, 2, 0) <= LINUX_VERSION_CODE
+static inline void kalCfg80211Disconnected(struct net_device *dev, u16 reason,
+			   u8 *ie, size_t ie_len,
+			   bool locally_generated, gfp_t gfp)
+{
+	cfg80211_disconnected(dev, reason, ie, ie_len, locally_generated, gfp);
+}
+#else
+static inline void kalCfg80211Disconnected(struct net_device *dev, u16 reason,
+			   u8 *ie, size_t ie_len,
+			   bool locally_generated, gfp_t gfp)
+{
+	cfg80211_disconnected(dev, reason, ie, ie_len, gfp);
+}
+#endif
 
 #endif /* RT_CFG80211_SUPPORT */
 

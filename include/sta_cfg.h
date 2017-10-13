@@ -66,5 +66,12 @@ INT Set_UsbWOWSuspend(
 INT Set_UsbWOWResume(
 		IN PRTMP_ADAPTER		pAd,
 		IN PSTRING				arg);
+/* Set chip into power-saving mode */
+INT Set_UsbPowerSaving(
+		IN PRTMP_ADAPTER		pAd,
+		IN PSTRING				arg);
+INT Set_AdvPowerSavingDebug(
+		IN PRTMP_ADAPTER		pAd,
+		IN PSTRING				arg);
 #endif /* RTMP_MAC_USB */
 #endif /* __STA_CFG_H__ */

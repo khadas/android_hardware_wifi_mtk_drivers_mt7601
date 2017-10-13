@@ -54,7 +54,7 @@
 #define RT_CONFIG_IF_OPMODE_ON_STA(__OpMode)
 #endif
 
-ULONG RTDebugLevel = 0;
+ULONG RTDebugLevel = RT_DEBUG_ERROR;
 ULONG RTDebugFunc = 0;
 
 #ifdef OS_ABL_FUNC_SUPPORT
@@ -1506,9 +1506,8 @@ int RtmpOSWrielessEventSend(
 		wrqu.data.length = dataLen;
 	else
 		wrqu.data.length = 0;
-#ifdef CONFIG_WEXT_CONF
+
 	wireless_send_event(pNetDev, eventType, &wrqu, (char *)pData);
-#endif
 	return 0;
 }
 
@@ -1539,9 +1538,8 @@ int RtmpOSWrielessEventSendExt(
 		wrqu.data.length = dataLen;
 
 	wrqu.addr.sa_family = family;
-#ifdef CONFIG_WEXT_CONF
+
 	wireless_send_event(pNetDev, eventType, &wrqu, (char *)pData);
-#endif
 	return 0;
 }
 
@@ -1875,7 +1873,7 @@ int RtmpOSNetDevAttach(
 /*		pNetDev->get_wireless_stats = rt28xx_get_wireless_stats; */
 		pNetDev->get_wireless_stats = pDevOpHook->get_wstats;
 #endif
-#ifdef CONFIG_WIRELESS_EXT
+
 #ifdef CONFIG_STA_SUPPORT
 #if WIRELESS_EXT >= 12
 		if (OpMode == OPMODE_STA) {
@@ -1884,8 +1882,7 @@ int RtmpOSNetDevAttach(
 		}
 #endif /*WIRELESS_EXT >= 12 */
 #endif /* CONFIG_STA_SUPPORT */
-#endif
-#ifdef CONFIG_WIRELESS_EXT
+
 #ifdef CONFIG_APSTA_MIXED_SUPPORT
 #if WIRELESS_EXT >= 12
 		if (OpMode == OPMODE_AP) {
@@ -1894,7 +1891,7 @@ int RtmpOSNetDevAttach(
 		}
 #endif /*WIRELESS_EXT >= 12 */
 #endif /* CONFIG_APSTA_MIXED_SUPPORT */
-#endif
+
 		/* copy the net device mac address to the net_device structure. */
 		NdisMoveMemory(pNetDev->dev_addr, &pDevOpHook->devAddr[0],
 			       MAC_ADDR_LEN);
@@ -2870,13 +2867,15 @@ BOOLEAN CFG80211_SupBandInit(
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 		if (IdLoop >= 14)
 		{
-		pChannels[IdLoop].center_freq = \
-			    		ieee80211_channel_to_frequency(Cfg80211_Chan[IdLoop], IEEE80211_BAND_5GHZ);
+			pChannels[IdLoop].center_freq =
+				ieee80211_channel_to_frequency
+					(Cfg80211_Chan[IdLoop], KAL_BAND_5GHZ);
 		}
 		else
 		{
-		    pChannels[IdLoop].center_freq = \
-			    		ieee80211_channel_to_frequency(Cfg80211_Chan[IdLoop], IEEE80211_BAND_2GHZ);			
+			pChannels[IdLoop].center_freq =
+				ieee80211_channel_to_frequency
+					(Cfg80211_Chan[IdLoop], KAL_BAND_2GHZ);
 		}
 #else
 		pChannels[IdLoop].center_freq = ieee80211_channel_to_frequency(Cfg80211_Chan[IdLoop]);
@@ -2895,7 +2894,7 @@ BOOLEAN CFG80211_SupBandInit(
 	for(IdLoop=0; IdLoop<NumOfRate; IdLoop++)
 		memcpy(&pRates[IdLoop], &Cfg80211_SupRate[IdLoop], sizeof(*pRates));
 
-	pBand = &pCfg80211_CB->Cfg80211_bands[IEEE80211_BAND_2GHZ];
+	pBand = &pCfg80211_CB->Cfg80211_bands[KAL_BAND_2GHZ];
 	if (pBandInfo->RFICType & RFIC_24GHZ)
 	{
 		pBand->n_channels = CFG80211_NUM_OF_CHAN_2GHZ;
@@ -2940,16 +2939,16 @@ BOOLEAN CFG80211_SupBandInit(
 		pBand->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 #endif /* DOT11_N_SUPPORT */
 
-		pWiphy->bands[IEEE80211_BAND_2GHZ] = pBand;
+		pWiphy->bands[KAL_BAND_2GHZ] = pBand;
 	}
 	else
 	{
-		pWiphy->bands[IEEE80211_BAND_2GHZ] = NULL;
+		pWiphy->bands[KAL_BAND_2GHZ] = NULL;
 		pBand->channels = NULL;
 		pBand->bitrates = NULL;
 	}
 
-	pBand = &pCfg80211_CB->Cfg80211_bands[IEEE80211_BAND_5GHZ];
+	pBand = &pCfg80211_CB->Cfg80211_bands[KAL_BAND_5GHZ];
 	if (pBandInfo->RFICType & RFIC_5GHZ)
 	{
 		pBand->n_channels = CFG80211_NUM_OF_CHAN_5GHZ;
@@ -2992,11 +2991,11 @@ BOOLEAN CFG80211_SupBandInit(
 		pBand->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 #endif /* DOT11_N_SUPPORT */
 
-		pWiphy->bands[IEEE80211_BAND_5GHZ] = pBand;
+		pWiphy->bands[KAL_BAND_5GHZ] = pBand;
 	}
 	else
 	{
-		pWiphy->bands[IEEE80211_BAND_5GHZ] = NULL;
+		pWiphy->bands[KAL_BAND_5GHZ] = NULL;
 		pBand->channels = NULL;
 		pBand->bitrates = NULL;
 	}
@@ -3171,8 +3170,8 @@ BOOLEAN CFG80211OS_BandInfoGet(
 	if (pWiphy == NULL)
 		return FALSE;
 
-	*ppBand24 = pWiphy->bands[IEEE80211_BAND_2GHZ];
-	*ppBand5 = pWiphy->bands[IEEE80211_BAND_5GHZ];
+	*ppBand24 = pWiphy->bands[KAL_BAND_2GHZ];
+	*ppBand5 = pWiphy->bands[KAL_BAND_5GHZ];
 	return TRUE;
 }
 
@@ -3283,9 +3282,9 @@ BOOLEAN CFG80211OS_ChanInfoInit(
 	memset(pChan, 0, sizeof(*pChan));
 
 	if (ChanId > 14)
-		pChan->band = IEEE80211_BAND_5GHZ;
+		pChan->band = KAL_BAND_5GHZ;
 	else
-		pChan->band = IEEE80211_BAND_2GHZ;
+		pChan->band = KAL_BAND_2GHZ;
 	/* End of if */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
@@ -3345,8 +3344,12 @@ VOID CFG80211OS_Scaning(
 	UINT32 IdChan;
 	UINT32 CenFreq;
 	UINT CurBand;
-        struct timespec ts;
-        UINT64 bootTime = 0;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
+	struct timespec ts;
+	UINT64 bootTime = 0;
+#else
+	struct timeval tv;
+#endif
 	struct wiphy *pWiphy = pCfg80211_CB->pCfg80211_Wdev->wiphy;
 	struct cfg80211_bss *bss = NULL;
 	struct ieee80211_mgmt *mgmt;
@@ -3358,17 +3361,17 @@ VOID CFG80211OS_Scaning(
 	/* get channel information */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 	if (ChanId > 14)
-	    CenFreq = ieee80211_channel_to_frequency(ChanId, IEEE80211_BAND_5GHZ);
+		CenFreq = ieee80211_channel_to_frequency(ChanId, KAL_BAND_5GHZ);
 	else
-		CenFreq = ieee80211_channel_to_frequency(ChanId, IEEE80211_BAND_2GHZ); 
+		CenFreq = ieee80211_channel_to_frequency(ChanId, KAL_BAND_2GHZ);
 #else
 	CenFreq = ieee80211_channel_to_frequency(ChanId);
 #endif
 
 	if (ChanId > 14)
-		CurBand = IEEE80211_BAND_5GHZ;
+		CurBand = KAL_BAND_5GHZ;
 	else
-		CurBand = IEEE80211_BAND_2GHZ;
+		CurBand = KAL_BAND_2GHZ;
 
 	pBand = &pCfg80211_CB->Cfg80211_bands[CurBand];
 	
@@ -3389,12 +3392,18 @@ VOID CFG80211OS_Scaning(
 		/* CFG80211_SIGNAL_TYPE_MBM: signal strength in mBm (100*dBm) */
 		RSSI = RSSI * 100;  
 	}
-
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
 	get_monotonic_boottime(&ts);
 	bootTime = ts.tv_sec;
 	bootTime *= USEC_PER_SEC;
 	bootTime += ts.tv_nsec/NSEC_PER_USEC;
 	mgmt->u.probe_resp.timestamp  = bootTime;
+#else
+	if (!mgmt->u.probe_resp.timestamp) {
+		do_gettimeofday(&tv);
+		mgmt->u.probe_resp.timestamp = ((UINT64) tv.tv_sec * 1000000) + tv.tv_usec;
+	}
+#endif
 	
 	/* inform 80211 a scan is got */
 	/* we can use cfg80211_inform_bss in 2.6.31, it is easy more than the one */
@@ -3451,8 +3460,8 @@ VOID CFG80211OS_ScanEnd(
 
 	if (pCfg80211_CB->pCfg80211_ScanReq)
 	{
-		CFG80211DBG(RT_DEBUG_ERROR, ("80211> cfg80211_scan_done\n"));
-		cfg80211_scan_done(pCfg80211_CB->pCfg80211_ScanReq, FlgIsAborted);
+		CFG80211DBG(RT_DEBUG_TRACE, ("80211> cfg80211_scan_done\n"));
+		kalCfg80211ScanDone(pCfg80211_CB->pCfg80211_ScanReq, FlgIsAborted);
 		pCfg80211_CB->pCfg80211_ScanReq = NULL;
 	}
 	else
@@ -3593,22 +3602,22 @@ BOOLEAN CFG80211OS_RxMgmt(IN PNET_DEV pNetDev, IN INT32 freq, IN PUCHAR frame, I
 #else
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
-	return cfg80211_rx_action(pNetDev, freq, frame, len, GFP_ATOMIC);
+		return cfg80211_rx_action(pNetDev, freq, frame, len, GFP_ATOMIC);
 #else
-	return FALSE;
-#endif /*2.6.34*/
-#endif /*2.6.37*/
-#endif /*3.4.0*/
-#endif
+		return FALSE;
+#endif /* LINUX_VERSION_CODE: 2.6.34 */
+#endif /* LINUX_VERSION_CODE: 2.6.37 */
+#endif /* LINUX_VERSION_CODE: 3.4.0 */
+#endif /* LINUX_VERSION_CODE: 3.6.0 */
 
 }
 
 VOID CFG80211OS_TxStatus(IN PNET_DEV pNetDev, IN INT32 cookie, IN PUCHAR frame, IN UINT32 len, IN BOOLEAN ack)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)) 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) 
         return cfg80211_mgmt_tx_status(pNetDev->ieee80211_ptr, cookie, frame, len, ack, GFP_ATOMIC);
 #else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
 	return cfg80211_mgmt_tx_status(pNetDev, cookie, frame, len, ack, GFP_ATOMIC);
 #else
 
@@ -3632,7 +3641,12 @@ VOID CFG80211OS_NewSta(IN PNET_DEV pNetDev, IN const PUCHAR mac_addr, IN const P
 
 /* If get error here, be sure patch the cfg80211_new_sta.patch into kernel. */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0))
+#if KERNEL_VERSION(4, 2, 0) <= LINUX_VERSION_CODE
+	/* In Kernel 4.0, nl80211.c does not check filled and */
+	/* also remove station_info_flags enum*/
+#else
         sinfo.filled = STATION_INFO_ASSOC_REQ_IES;
+#endif
 #elif defined(SUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES)
 /*On Android platform with other kernel version(eg. 3.1.10)*/
 /*For hostapd, the IEs from the (Re)Association Request frame need to be made available*/

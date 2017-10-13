@@ -276,7 +276,7 @@ VOID APStartUp(
 			/* WPS V2 doesn't support WEP and WPA/WPAPSK-TKIP. */
 			if ((pMbss->WepStatus == Ndis802_11WEPEnabled) || 
 				(pMbss->WepStatus == Ndis802_11Encryption2Enabled) ||
-				(pMbss->bHideSsid))
+				(pMbss->hidden_ssid != NL80211_HIDDEN_SSID_NOT_IN_USE))
 				WscOnOff(pAd, apidx, TRUE);
 			else
 				WscOnOff(pAd, apidx, FALSE);
@@ -768,6 +768,12 @@ DBGPRINT(RT_DEBUG_OFF, ("%s(): AP Set CentralFreq at %d(Prim=%d, HT-CentCh=%d, V
 	}
 #endif /* MT7601 */
 
+#ifdef ED_MONITOR
+		/*TODO: for certification only!*/
+		if (!IS_MT7601(pAd))
+			ed_monitor_init(pAd);
+#endif /* ED_MONITOR */
+
 	DBGPRINT(RT_DEBUG_TRACE, ("<=== APStartUp\n"));
 }
 
@@ -786,6 +792,12 @@ VOID APStop(
 	INT			apidx;
 	
 	DBGPRINT(RT_DEBUG_TRACE, ("!!! APStop !!!\n"));
+
+#ifdef ED_MONITOR
+	/*TODO: for certification only!*/
+	if (!IS_MT7601(pAd))
+		ed_monitor_exit(pAd);
+#endif /* ED_MONITOR */
 
 #ifdef DFS_SUPPORT
 		NewRadarDetectionStop(pAd);

@@ -18,6 +18,7 @@
 #include "rtmp_comm.h"
 #include "rt_os_util.h"
 #include "rt_os_net.h"
+#include "rt_config.h"
 #ifdef CONFIG_ELIAN_SUPPORT
 #include "../../elian/os/linux/glue.h"
 #endif
@@ -26,13 +27,12 @@
 
 #ifdef ALLWINNER
 #include <mach/sys_config.h>
-extern int sunxi_usb_disable_hcd(__u32 usbc_no);
-extern int sunxi_usb_enable_hcd(__u32 usbc_no);
-extern void rf_module_power(int on);
+extern int sw_usb_disable_hcd(__u32 usbc_no);
+extern int sw_usb_enable_hcd(__u32 usbc_no);
 static script_item_u item;
 //extern int script_parser_fetch(char *main_name, char *sub_name, int value[], int count);
 
-static int usb_wifi_host = 3;
+static int usb_wifi_host = 2;
 #endif /*ALLWINNER_PLATFORM*/
 
 #ifdef AMLOGIC
@@ -86,13 +86,15 @@ static void rt2870_early_suspend(struct early_suspend *early)
 {
 	POS_COOKIE   pOS_cookie = container_of(early, struct os_cookie, early_suspend);
 	VOID			*pAd = NULL;
+#if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
+	UCHAR Flag;
+#endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */
+
 	DBGPRINT(RT_DEBUG_ERROR, ("%s : %s\n", DRIVER_ROLE, __func__));		
 
 	GET_PAD_FROM_NET_DEV(pAd, pOS_cookie->net_dev)	
 
 #if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
-	UCHAR Flag;
-
 	RTMP_DRIVER_ADAPTER_RT28XX_WOW_STATUS(pAd, &Flag);
 
 	if (Flag == TRUE)
@@ -110,13 +112,14 @@ static void rt2870_late_resume(struct early_suspend *early)
 {
         POS_COOKIE   pOS_cookie = container_of(early, struct os_cookie, early_suspend);
 		VOID			*pAd = NULL;
-        DBGPRINT(RT_DEBUG_ERROR, ("%s : %s\n", DRIVER_ROLE, __func__));
+#if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
+	UCHAR Flag;
+#endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */
 
+        DBGPRINT(RT_DEBUG_ERROR, ("%s : %s\n", DRIVER_ROLE, __func__));
 		
         GET_PAD_FROM_NET_DEV(pAd, pOS_cookie->net_dev)
 #if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
-	UCHAR Flag;
-
 	RTMP_DRIVER_ADAPTER_RT28XX_WOW_STATUS(pAd, &Flag);
 #endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */	
 			
@@ -506,11 +509,17 @@ static int rt2870_suspend(
 {
 //	struct net_device *net_dev;
 	VOID *pAd = usb_get_intfdata(intf);
+
 #if (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT)
 	UCHAR Flag;
 
 	RTMP_DRIVER_ADAPTER_RT28XX_WOW_STATUS(pAd, &Flag);
 #endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */	
+
+#ifdef ED_MONITOR
+	DBGPRINT(RT_DEBUG_ERROR, ("@@@ %s: go to ed_monitor_exit()!!\n", __FUNCTION__));
+	ed_monitor_exit(pAd);
+#endif /* ED_MONITOR */
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 //	UCHAR check_early_suspend_flag;
@@ -681,7 +690,7 @@ INT __init rtusb_init(void)
 #else
 
 
-/* ?¨úcard_line­È */
+/* ?\A8\FAcard_line\AD\C8 */
 	type = script_get_item("wifi_para", "wifi_usbc_id", &item);
 	if(SCIRPT_ITEM_VALUE_TYPE_INT != type){				
 		printk("ERR: script_get_item wifi_usbc_id failed\n");				
@@ -690,10 +699,8 @@ INT __init rtusb_init(void)
 	printk("%s: sw_usb_enable_hcd: usbc_num = %d\n", DRIVER_ROLE, item.val);
 
 #endif
-	rf_module_power(1);
-	mdelay(100);
         //sw_usb_enable_hcd(usb_wifi_host);
-        sunxi_usb_enable_hcd(item.val);
+        sw_usb_enable_hcd(item.val);
 #endif
 
 #ifdef AMLOGIC
@@ -716,8 +723,7 @@ VOID __exit rtusb_exit(void)
 	usb_deregister(&rtusb_driver);	
 #ifdef ALLWINNER
         printk("%s: sw_usb_disable_hcd: usbc_num = %d\n",DRIVER_ROLE, item.val);
-        sunxi_usb_disable_hcd(item.val);
-	rf_module_power(0);
+        sw_usb_disable_hcd(item.val);
 #endif
 
 #ifdef AMLOGIC

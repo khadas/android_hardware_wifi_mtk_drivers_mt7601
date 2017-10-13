@@ -1491,4 +1491,10 @@ typedef struct _WAPI_WIE_STRUCT {
 #define RT_OID_IWSC_SMPBC_ENROLLEE_COUNT	0x0902
 #endif // IWSC_SUPPORT //
 
+#ifdef RTMP_MAC_USB
+#define RT_OID_USB_WOW_SUSPEND				0x0920
+#define RT_OID_USB_WOW_RESUME				0x0921
+#define RT_OID_USB_POWER_SAVING				0x0922
+#endif /* RTMP_MAC_USB */
+
 #endif /* _OID_H_ */

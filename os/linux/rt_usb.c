@@ -140,10 +140,11 @@ VOID RtmpMgmtTaskExit(
 	pTask = &pAd->cmdQTask;
 	RTMP_OS_TASK_LEGALITY(pTask)
 	{
+#ifndef KTHREAD_SUPPORT
 		NdisAcquireSpinLock(&pAd->CmdQLock);
 		pAd->CmdQ.CmdQState = RTMP_TASK_STAT_STOPED;
 		NdisReleaseSpinLock(&pAd->CmdQLock);
-
+#endif
 		/*RTUSBCMDUp(&pAd->cmdQTask); */
 		ret = RtmpOSTaskKill(pTask);
 		if (ret == NDIS_STATUS_FAILURE)
@@ -1199,6 +1200,7 @@ INT RTUSBCmdThread(
 {
 	RTMP_ADAPTER *pAd;
 	RTMP_OS_TASK *pTask;
+	CmdQElmt *pCmdQElmt = NULL;
 	int status;
 	status = 0;
 
@@ -1229,34 +1231,25 @@ INT RTUSBCmdThread(
 			CMDHandler(pAd);
 	}
 
-	if (!pAd->PM_FlgSuspend)
-	{	/* Clear the CmdQElements. */
-		CmdQElmt	*pCmdQElmt = NULL;
-
-		NdisAcquireSpinLock(&pAd->CmdQLock);
-		pAd->CmdQ.CmdQState = RTMP_TASK_STAT_STOPED;
-		while(pAd->CmdQ.size)
-		{
-			RTThreadDequeueCmd(&pAd->CmdQ, &pCmdQElmt);
-			if (pCmdQElmt)
-			{
-				if (pCmdQElmt->CmdFromNdis == TRUE)
-				{
-					if (pCmdQElmt->buffer != NULL)
-						os_free_mem(pAd, pCmdQElmt->buffer);
-					os_free_mem(pAd, (PUCHAR)pCmdQElmt);
-				}
-				else
-				{
-					if ((pCmdQElmt->buffer != NULL) && (pCmdQElmt->bufferlength != 0))
-						os_free_mem(pAd, pCmdQElmt->buffer);
-					os_free_mem(pAd, (PUCHAR)pCmdQElmt);
-				}
+	/* Clear the CmdQElements. */
+	NdisAcquireSpinLock(&pAd->CmdQLock);
+	pAd->CmdQ.CmdQState = RTMP_TASK_STAT_STOPED;
+	while (pAd->CmdQ.size) {
+		RTThreadDequeueCmd(&pAd->CmdQ, &pCmdQElmt);
+		if (pCmdQElmt) {
+			if (pCmdQElmt->CmdFromNdis == TRUE) {
+				if (pCmdQElmt->buffer != NULL)
+					os_free_mem(pAd, pCmdQElmt->buffer);
+				os_free_mem(pAd, (PUCHAR)pCmdQElmt);
+			} else {
+				if ((pCmdQElmt->buffer != NULL) && (pCmdQElmt->bufferlength != 0))
+					os_free_mem(pAd, pCmdQElmt->buffer);
+				os_free_mem(pAd, (PUCHAR)pCmdQElmt);
 			}
 		}
-
-		NdisReleaseSpinLock(&pAd->CmdQLock);
 	}
+	NdisReleaseSpinLock(&pAd->CmdQLock);
+
 	/* notify the exit routine that we're actually exiting now 
 	 *
 	 * complete()/wait_for_completion() is similar to up()/down(),

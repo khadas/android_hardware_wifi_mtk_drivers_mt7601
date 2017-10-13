@@ -660,7 +660,7 @@ NDIS_STATUS	RTMPAllocTxRxRingMemory(
 			/*Allocate URB and bulk buffer*/
 			for(ringidx=0;ringidx < BUF_ALIGMENT_RINGSIZE ;ringidx++)
 			{
-			//	printk("allocate tx ringidx %d \n",ringidx);
+				printk("allocate tx ringidx %d \n",ringidx);
 				Status = RTMPAllocUsbBulkBufStruct(pAd, 
 													&pHTTXContext->pUrb[ringidx], 
 													(PVOID *)&pHTTXContext->TransferBuffer[ringidx], 
@@ -693,7 +693,7 @@ NDIS_STATUS	RTMPAllocTxRxRingMemory(
 			pHTTXContext->TransferBuffer = RTMPQMemAddr(sizeof(HTTX_BUFFER), &pHTTXContext->data_dma, acidx+BLK_TX0);
 			if (pHTTXContext->TransferBuffer == NULL)
 				goto err;
-		//	printk("[%d] pHTTXContext TransferBuffer=0x%x,DMA=0x%x\n", acidx, (unsigned int)(pHTTXContext->TransferBuffer), pHTTXContext->data_dma);		
+			printk("[%d] pHTTXContext TransferBuffer=0x%x,DMA=0x%x\n", acidx, (unsigned int)(pHTTXContext->TransferBuffer), pHTTXContext->data_dma);		
 #endif		
 #endif /* USB_BULK_BUF_ALIGMENT */
 		}
@@ -788,7 +788,7 @@ NDIS_STATUS	RTMPAllocTxRxRingMemory(
 			if (pRxContext->TransferBuffer == NULL)
 				goto err;
 		
-		//	printk("[%d] pRxContext TransferBuffer=0x%x,DMA=0x%x\n", i, (unsigned int)(pRxContext->TransferBuffer), pRxContext->data_dma);							
+			printk("[%d] pRxContext TransferBuffer=0x%x,DMA=0x%x\n", i, (unsigned int)(pRxContext->TransferBuffer), pRxContext->data_dma);							
 #endif
 		}
 	
@@ -813,7 +813,7 @@ NDIS_STATUS	RTMPAllocTxRxRingMemory(
 		if (pCmdRspEventContext->CmdRspBuffer == NULL)
 			goto err;	
 		
-	//	printk("pCmdRspEventContext TransferBuffer=0x%x,DMA=0x%x\n", (unsigned int)(pCmdRspEventContext->CmdRspBuffer), pCmdRspEventContext->data_dma);					
+		printk("pCmdRspEventContext TransferBuffer=0x%x,DMA=0x%x\n", (unsigned int)(pCmdRspEventContext->CmdRspBuffer), pCmdRspEventContext->data_dma);					
 #endif
 
 		NdisZeroMemory(&pAd->FragFrame, sizeof(FRAGMENT_FRAME));
@@ -2277,6 +2277,7 @@ VOID RT28xxUsbAsicRadioOff(RTMP_ADAPTER *pAd)
 		MT7601DisableTxRx(pAd, GUIRADIO_OFF);
 
 		AndesPwrSavingOP(pAd, RADIO_OFF, 0x01, 0, 0, 0, 0);
+		RTMP_CLEAR_FLAG(pAd, fRTMP_ADAPTER_MCU_SEND_IN_BAND_CMD);
 	}
 	else
 #endif /* MT7601 */
@@ -2360,6 +2361,7 @@ VOID RT28xxUsbAsicRadioOn(RTMP_ADAPTER *pAd)
 #ifdef MT7601
 	if ( IS_MT7601(pAd) )
 	{
+		RTMP_SET_FLAG(pAd, fRTMP_ADAPTER_MCU_SEND_IN_BAND_CMD);
 		AndesPwrSavingOP(pAd, RADIO_ON, 0, 0, 0, 0, 0);
 		
 		//pAd->hw_cfg.cent_ch = pAd->CommonCfg.CentralChannel;

@@ -1779,11 +1779,18 @@ VOID AsicSetEdcaParm(
 			
 		}
 #endif /* CONFIG_STA_SUPPORT */
-
-		Ac3Cfg.field.AcTxop = pEdcaParm->Txop[QID_AC_VO];
+Ac3Cfg.field.AcTxop = pEdcaParm->Txop[QID_AC_VO];
+Ac3Cfg.field.Cwmax = pEdcaParm->Cwmax[QID_AC_VO];
+#ifdef CERTIFICATION_SIGMA_SUPPORT
+		/* For TGn Wi-Fi 5.2.27, 5.2.30. */
+		Ac3Cfg.field.Cwmin = pEdcaParm->Cwmin[QID_AC_VO] - 1;
+		Ac3Cfg.field.Aifsn = pEdcaParm->Aifsn[QID_AC_VO] - 1;
+#else
 		Ac3Cfg.field.Cwmin = pEdcaParm->Cwmin[QID_AC_VO];
-		Ac3Cfg.field.Cwmax = pEdcaParm->Cwmax[QID_AC_VO];
 		Ac3Cfg.field.Aifsn = pEdcaParm->Aifsn[QID_AC_VO];
+#endif
+
+
 
 /*#ifdef WIFI_TEST*/
 		if (pAd->CommonCfg.bWiFiTest)
@@ -1806,7 +1813,10 @@ VOID AsicSetEdcaParm(
 		RTMP_IO_WRITE32(pAd, EDCA_AC2_CFG, Ac2Cfg.word);
 		RTMP_IO_WRITE32(pAd, EDCA_AC3_CFG, Ac3Cfg.word);
 
-
+#ifdef CERTIFICATION_SIGMA_SUPPORT
+		/* For TGn Wi-Fi 5.2.27, 5.2.30. */
+		Ac3Cfg.field.Aifsn = Ac3Cfg.field.Aifsn + 1;
+#endif
 		/*========================================================*/
 		/*      DMA Register has a copy too.*/
 		/*========================================================*/
@@ -1894,6 +1904,12 @@ VOID AsicSetEdcaParm(
 			AifsnCsr.field.Aifsn3 = Ac3Cfg.field.Aifsn - 1; /*pEdcaParm->Aifsn[QID_AC_VO]; for TGn wifi test*/
 		}
 #endif /* CONFIG_STA_SUPPORT */
+
+#ifdef CERTIFICATION_SIGMA_SUPPORT
+		/* For TGn Wi-Fi 5.2.27, 5.2.30. */
+		AifsnCsr.field.Aifsn2  = AifsnCsr.field.Aifsn2 - 1;
+#endif
+
 		RTMP_IO_WRITE32(pAd, WMM_AIFSN_CFG, AifsnCsr.word);
 
 		NdisMoveMemory(&pAd->CommonCfg.APEdcaParm, pEdcaParm, sizeof(EDCA_PARM));
@@ -2942,13 +2958,115 @@ VOID RT28xxAndesWOWEnable(
 	NEW_WOW_MASK_CFG_STRUCT mask_cfg;
 	NEW_WOW_SEC_CFG_STRUCT sec_cfg;
 	NEW_WOW_INFRA_CFG_STRUCT infra_cfg;
-	NEW_WOW_P2P_CFG_STRUCT p2p_cfg;
 	NEW_WOW_PARAM_STRUCT wow_param;
 	struct CMD_UNIT CmdUnit;
-	RTMP_CHIP_CAP *pChipCap = &pAd->chipCap;
 	INT32 Ret;
 	MAC_TABLE_ENTRY *pEntry = NULL;
+	UINT32 Value, MACValue = 0, MACValue2 = 0;
+	UINT8 i;
+	CHAR NextDTIM;
 
+	if (INFRA_ON(pAd)) {
+
+		ULONG	Addr4;
+		PUCHAR	pBssid = pAd->CommonCfg.Bssid;
+
+		DBGPRINT(RT_DEBUG_ERROR,
+			("===> WOW Set Bssid %x:%x:%x:%x:%x:%x\n", PRINT_MAC(pBssid)));
+
+		Addr4 = (ULONG)(pBssid[0]) |
+			(ULONG)(pBssid[1] << 8)  |
+			(ULONG)(pBssid[2] << 16) |
+			(ULONG)(pBssid[3] << 24);
+		RTMP_IO_WRITE32(pAd, MAC_BSSID_DW0, Addr4);
+
+		Addr4 = 0;
+		/* always one BSSID in STA mode*/
+		Addr4 = (ULONG)(pBssid[4]) | (ULONG)(pBssid[5] << 8);
+		RTMP_IO_WRITE32(pAd, MAC_BSSID_DW1, Addr4);
+
+#ifdef NEW_WOW_SUPPORT
+		/* Block data EP bulkout before waiting Tx Q empty */
+		if (!RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING)) {
+			RTMP_SET_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING);
+		} else {
+			CFG80211DBG(RT_DEBUG_ERROR,
+				    ("[%s] --------------Duplicate Suspend Operation\n", __func__));
+			goto error;
+		}
+#endif /* NEW_WOW_SUPPORT */
+
+	}
+
+	/* 0. Disable MAC RX */
+	RTMP_IO_FORCE_WRITE32(pAd, MAC_SYS_CTRL, 4); /* tx only, no rx. */
+	RTMP_IO_FORCE_READ32(pAd, MAC_SYS_CTRL, &MACValue);
+	DBGPRINT(RT_DEBUG_ERROR, ("WoW: Disable MAC RX, MAC[%04x]:%08x\n", MAC_SYS_CTRL, MACValue));
+
+	/* 0.1 Set the MPDU_MAX_LEN to 1564 */
+	RTMP_IO_FORCE_READ32(pAd, MAX_LEN_CFG, &MACValue);
+	MACValue &= 0xFFFFF61c;
+	RTMP_IO_FORCE_WRITE32(pAd, MAX_LEN_CFG, MACValue);
+	RTMP_IO_FORCE_READ32(pAd, MAX_LEN_CFG, &MACValue);
+	DBGPRINT(RT_DEBUG_ERROR, ("WoW: MAX_LEN_CFG, MAC[%04x]:%08x\n", MAX_LEN_CFG, MACValue));
+
+	/* 1. Wait Rx MAC not busy */
+	i = 0;
+	do {
+		RTMP_IO_FORCE_READ32(pAd, MAC_STATUS_CFG, &MACValue);
+		if ((MACValue & 0x2) == 0x0)
+				break;
+		RTMPusecDelay(20);
+		i++;
+		DBGPRINT(RT_DEBUG_TRACE, ("WoW:Wait for MAC Rx busy %d times\n", i));
+	} while (i < 50);
+	if (i >= 50)
+		DBGPRINT(RT_DEBUG_ERROR,
+		("WoW:MAC TX  keeps busy, MAC_STATUS_CFG = 0x%x. return on AsicRadioOff ()\n",
+		MACValue));
+
+	/* 2. Wait Rx PBF not busy */
+	i = 0;
+	do {
+		RTMP_IO_FORCE_READ32(pAd, RXQ_STA, &MACValue);
+		if (((MACValue & 0x00FF0000) == 0) && ((MACValue & 0xFF) == 0x22))
+			break;
+		RTMPusecDelay(20);
+		i++;
+		DBGPRINT(RT_DEBUG_TRACE, ("WoW:Wait for Rx PBF busy %d times\n", i));
+	} while (i < 50); /* wait for 20us*50 = 1 sec */
+	if (i >= 50) {
+		DBGPRINT(RT_DEBUG_ERROR,
+		("WoW:MAC RX  keeps busy, RXQ_STA = 0x%x. return on AsicRadioOff ()\n",
+		(MACValue & 0x00FF0000)));
+	}
+
+	/* 3. Wait Rx FCE not busy */
+	i = 0;
+	do {
+		RTMP_IO_FORCE_READ32(pAd, 0x0a30, &MACValue);
+		RTMP_IO_FORCE_READ32(pAd, 0x0a34, &MACValue2);
+		if ((MACValue == 0) && (MACValue2 == 0))
+			break;
+		RTMPusecDelay(20);
+		i++;
+		DBGPRINT(RT_DEBUG_TRACE, ("WoW:Wait for Rx FCE busy %d times\n", i));
+	} while (i < 50); /* wait for 20us*50 = 1 sec */
+	if (i >= 50)
+		DBGPRINT(RT_DEBUG_ERROR, ("WoW:FCE RX  keeps busy, return on AsicRadioOff ()\n"));
+
+	/* 4. Polling UDMA RX idle */
+	i = 0;
+	do {
+		RTMP_IO_FORCE_READ32(pAd, USB_DMA_CFG, &MACValue);
+		if (((MACValue >> 30) & 0x1) == 0)
+			break;
+		RTMPusecDelay(20);
+		i++;
+		DBGPRINT(RT_DEBUG_TRACE, ("WoW:Wait for UDMA Rx idle %d times\n", i));
+	} while (i < 50); /* wait for 20us*50 = 1 sec */
+	if (i >= 50)
+		DBGPRINT(RT_DEBUG_ERROR, ("WoW:UDMA RX keeps busy, return on AsicRadioOff ()\n"));
 
 	NdisZeroMemory(&CmdUnit, sizeof(CmdUnit));
 
@@ -2964,8 +3082,7 @@ VOID RT28xxAndesWOWEnable(
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 
-	if (Ret != NDIS_STATUS_SUCCESS)
-	{
+	if (Ret != NDIS_STATUS_SUCCESS) {
 		printk("\x1b[31m%s: send WOW config command failed(%d/%d)!!\x1b[m\n", __FUNCTION__,
 					CmdUnit.u.ANDES.Type, wow_param.Parameter);
 		return;
@@ -2986,8 +3103,7 @@ VOID RT28xxAndesWOWEnable(
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 
-	if (Ret != NDIS_STATUS_SUCCESS)
-	{
+	if (Ret != NDIS_STATUS_SUCCESS) {
 		printk("\x1b[31m%s: send WOW config command failed!!(%d/%d)\x1b[m\n", __FUNCTION__,
 					CmdUnit.u.ANDES.Type, mask_cfg.Config_Type);
 		return;
@@ -2996,34 +3112,58 @@ VOID RT28xxAndesWOWEnable(
 	RtmpOsMsDelay(1);
 
 	/* security configuration */
-	if (pAd->StaCfg.AuthMode >= Ndis802_11AuthModeWPAPSK)
-	{
+	if (pAd->StaCfg.AuthMode >= Ndis802_11AuthModeWPAPSK) {
 		NdisZeroMemory(&sec_cfg, sizeof(sec_cfg));
-	
+
 		sec_cfg.Config_Type = WOW_SEC_CFG; 	/* security config */
 
 		if (pAd->StaCfg.AuthMode == Ndis802_11AuthModeWPAPSK)
 			sec_cfg.WPA_Ver = 0;
 		else if (pAd->StaCfg.AuthMode == Ndis802_11AuthModeWPA2PSK)
 			sec_cfg.WPA_Ver = 1;
-		
+
 		pEntry = &pAd->MacTab.Content[BSSID_WCID];
-		
+
+		#ifdef WPA_SUPPLICANT_SUPPORT
+
+		DBGPRINT(RT_DEBUG_OFF, ("Set Key = %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+					pAd->WOW_Cfg.PTK[0], pAd->WOW_Cfg.PTK[1],
+					pAd->WOW_Cfg.PTK[2], pAd->WOW_Cfg.PTK[3],
+					pAd->WOW_Cfg.PTK[4], pAd->WOW_Cfg.PTK[5],
+					pAd->WOW_Cfg.PTK[6], pAd->WOW_Cfg.PTK[7]));
+		DBGPRINT(RT_DEBUG_OFF, (":%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+					pAd->WOW_Cfg.PTK[8], pAd->WOW_Cfg.PTK[9],
+					pAd->WOW_Cfg.PTK[10], pAd->WOW_Cfg.PTK[11],
+					pAd->WOW_Cfg.PTK[12], pAd->WOW_Cfg.PTK[13],
+					pAd->WOW_Cfg.PTK[14], pAd->WOW_Cfg.PTK[15]));
+
+		NdisCopyMemory(sec_cfg.PTK, pAd->WOW_Cfg.PTK, 64);
+		NdisCopyMemory(sec_cfg.R_COUNTER, pAd->WOW_Cfg.ReplayCounter, LEN_KEY_DESC_REPLAY);
+		#else
 		NdisCopyMemory(sec_cfg.PTK, pEntry->PTK, 64);
 		NdisCopyMemory(sec_cfg.R_COUNTER, pEntry->R_Counter, LEN_KEY_DESC_REPLAY);
-		
+		#endif  /* WPA_SUPPLICANT_SUPPORT */
+
 		sec_cfg.Key_Id = pAd->StaCfg.DefaultKeyId;
 		sec_cfg.Cipher_Alg = pEntry->WepStatus;
-		printk("\x1b[31m%s: wep status %d\x1b[m\n", __FUNCTION__, pEntry->WepStatus);
+		DBGPRINT(RT_DEBUG_OFF,
+			("\x1b[31m: wep status %d\x1b[m\n", pEntry->WepStatus));
 		sec_cfg.Group_Cipher = pAd->StaCfg.GroupCipher;
-		printk("\x1b[31m%s: group status %d\x1b[m\n", __FUNCTION__, sec_cfg.Group_Cipher);
-		printk("\x1b[31m%s: aid %d\x1b[m\n", __FUNCTION__, pEntry->Aid);
-		sec_cfg.WCID = BSSID_WCID;
-		
+		DBGPRINT(RT_DEBUG_OFF,
+			("\x1b[31m: group status %d\x1b[m\n", sec_cfg.Group_Cipher));
+		DBGPRINT(RT_DEBUG_OFF,
+			("\x1b[31m: aid %d\x1b[m\n", pAd->StaActive.Aid));
+		DBGPRINT(RT_DEBUG_TRACE, ("Key = %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:",
+			sec_cfg.PTK[0], sec_cfg.PTK[1], sec_cfg.PTK[2], sec_cfg.PTK[3],
+			sec_cfg.PTK[4],	sec_cfg.PTK[5], sec_cfg.PTK[6], sec_cfg.PTK[7]));
+		DBGPRINT(RT_DEBUG_TRACE, ("Key = %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+			sec_cfg.PTK[8], sec_cfg.PTK[9],	sec_cfg.PTK[10], sec_cfg.PTK[11],
+			sec_cfg.PTK[12], sec_cfg.PTK[13], sec_cfg.PTK[14], sec_cfg.PTK[15]));
+		sec_cfg.Aid = pAd->StaActive.Aid;
 		CmdUnit.u.ANDES.Type = CMD_WOW_CONFIG; /* WOW config */
 		CmdUnit.u.ANDES.CmdPayloadLen = sizeof(NEW_WOW_SEC_CFG_STRUCT);
 		CmdUnit.u.ANDES.CmdPayload = (PUCHAR)&sec_cfg;
-	
+
 		Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 	
 		if (Ret != NDIS_STATUS_SUCCESS)
@@ -3056,15 +3196,13 @@ VOID RT28xxAndesWOWEnable(
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 
-	if (Ret != NDIS_STATUS_SUCCESS)
-	{
+	if (Ret != NDIS_STATUS_SUCCESS) {
 		printk("\x1b[31m%s: send WOW config command failed(%d/%d)!!\x1b[m\n", __FUNCTION__,
 					CmdUnit.u.ANDES.Type, infra_cfg.Config_Type);
 		return;
 	}
 
 	RtmpOsMsDelay(1);
-	
 
 	/* P2P configuration */
 
@@ -3072,8 +3210,7 @@ VOID RT28xxAndesWOWEnable(
 	NdisZeroMemory(&wow_param, sizeof(wow_param));
 
 	wow_param.Parameter = WOW_WAKEUP; /* Wakeup Option */
-	if (pAd->WOW_Cfg.bInBand)
-	{
+	if (pAd->WOW_Cfg.bInBand) {
 #ifdef RTMP_MAC_PCI
 		wow_param.Value = WOW_WAKEUP_BY_PCIE;
 #else
@@ -3098,8 +3235,7 @@ VOID RT28xxAndesWOWEnable(
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 
-	if (Ret != NDIS_STATUS_SUCCESS)
-	{
+	if (Ret != NDIS_STATUS_SUCCESS) {
 		printk("\x1b[31m%s: send WOW config command failed(%d/%d)!!\x1b[m\n", __FUNCTION__,
 					CmdUnit.u.ANDES.Type, wow_param.Parameter);
 		return;
@@ -3107,6 +3243,27 @@ VOID RT28xxAndesWOWEnable(
 
 	RtmpOsMsDelay(1);
 
+	/* disable usb interrupt */
+	NdisZeroMemory(&wow_param, sizeof(wow_param));
+	wow_param.Parameter = WOW_USB_INTERRUPT;
+	wow_param.Value = WOW_DISABLE_USB_INTERRUPT;
+
+	CmdUnit.u.ANDES.Type = CMD_WOW_FEATURE; /* feature enable */
+	CmdUnit.u.ANDES.CmdPayloadLen = sizeof(NEW_WOW_PARAM_STRUCT);
+	CmdUnit.u.ANDES.CmdPayload = (PUCHAR)&wow_param.Parameter;
+
+	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
+
+	if (Ret != NDIS_STATUS_SUCCESS) {
+		DBGPRINT(RT_DEBUG_OFF,
+			("\x1b[31m: send WOW config command failed(%d/%d)!!\x1b[m\n",
+			CmdUnit.u.ANDES.Type, wow_param.Parameter));
+		return;
+	}
+
+	DBGPRINT(RT_DEBUG_OFF,
+			("\x1b[31m%s: disable usb interrupt \x1b[m\n", __func__));
+	RtmpOsMsDelay(1);
 
 	/* traffic to Andes */
 	NdisZeroMemory(&wow_param, sizeof(wow_param));
@@ -3119,16 +3276,40 @@ VOID RT28xxAndesWOWEnable(
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
 
-	if (Ret != NDIS_STATUS_SUCCESS)
-	{
+	if (Ret != NDIS_STATUS_SUCCESS) {
 		printk("\x1b[31m%s: send WOW config command failed(%d/%d)!!\x1b[m\n", __FUNCTION__,
 					CmdUnit.u.ANDES.Type, wow_param.Parameter);
 		return;
 	}
-	
+
 	RtmpOsMsDelay(1);
 
-    RTMP_SET_FLAG(pAd, fRTMP_ADAPTER_IDLE_RADIO_OFF);
+	/* enable advance power saving */
+	RTMP_IO_READ32(pAd, TBTT_TIMER, &Value);
+	DBGPRINT(RT_DEBUG_OFF, ("\x1b[31m%s: Value %x\x1b[m\n", __func__, Value));
+	
+	if (Value < 160)
+		RtmpOsMsDelay(20); /* delay for across beacon boundary */
+
+	RTMP_IO_READ32(pAd, TBTT_TIMER, &Value);
+	DBGPRINT(RT_DEBUG_OFF, ("\x1b[32m%s: Value %x\x1b[m\n", __func__, Value));
+
+	NextDTIM = pAd->StaCfg.DtimCount - 1;
+	NextDTIM = NextDTIM >= 0 ? NextDTIM : pAd->StaCfg.DtimPeriod - 1;
+
+	AndesPwrSavingOP(pAd, RADIO_OFF_ADVANCE, 0x1, pAd->CommonCfg.BeaconPeriod,
+		pAd->StaCfg.DtimPeriod, NextDTIM, 0);
+
+	DBGPRINT(RT_DEBUG_OFF,
+		("\x1b[33m: DTIM period %d, beacon period %d, next DTIM %d, TBTT Timer %x\x1b[m\n",
+		pAd->StaCfg.DtimPeriod, pAd->CommonCfg.BeaconPeriod, NextDTIM, Value));
+
+	RTMP_SET_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDED);
+	RTMP_SET_FLAG(pAd, fRTMP_ADAPTER_IDLE_RADIO_OFF);
+
+error:
+	return;
+
 }
 
 VOID RT28xxAndesWOWDisable(
@@ -3136,10 +3317,8 @@ VOID RT28xxAndesWOWDisable(
 {
     NEW_WOW_PARAM_STRUCT param;
     struct CMD_UNIT CmdUnit;
-    RTMP_CHIP_CAP *pChipCap = &pAd->chipCap;
     INT32 Ret;
     UINT32 Value;
-    MAC_TABLE_ENTRY *pEntry = NULL;
 
     printk("\x1b[31m%s: ...\x1b[m", __FUNCTION__);
 
@@ -3188,6 +3367,8 @@ VOID RT28xxAndesWOWDisable(
 
     RtmpOsMsDelay(1);
 
+	/* disable advance power saving */
+	AndesPwrSavingOP(pAd, RADIO_ON_ADVANCE, 0, 0, 0, 0, 0);
 
     /* Restore MAC TX/RX */
     RTMP_IO_READ32(pAd, MAC_SYS_CTRL, &Value);
@@ -3216,6 +3397,9 @@ VOID RT28xxAndesWOWDisable(
 		Value &= ~0x01010000; /* GPIO0(ouput) --> 0(data) */ 
 		RTMP_IO_WRITE32(pAd, WLAN_FUN_CTRL, Value);
 	}
+
+	RTMP_CLEAR_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING);
+	RTMP_CLEAR_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDED);
 }
 
 #endif /* NEW_WOW_SUPPORT */

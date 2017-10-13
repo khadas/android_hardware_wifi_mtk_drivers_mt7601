@@ -3132,6 +3132,8 @@ NDIS_STATUS	RTMPSetProfileParameters(
 			/*HideSSID*/
 			if(RTMPGetKeyParameter("HideSSID", tmpbuf, 32, pBuffer, TRUE))
 			{
+				INT ret;
+				LONG longtmp;
 				for (i = 0, macptr = rstrtok(tmpbuf,";"); macptr; macptr = rstrtok(NULL,";"), i++)
 			    {
 					int apidx = i;
@@ -3139,17 +3141,21 @@ NDIS_STATUS	RTMPSetProfileParameters(
 					if (i >= pAd->ApCfg.BssidNum)
 						break;
 
-					if(simple_strtol(macptr, 0, 10) != 0)  /*Enable*/
-					{
-						pAd->ApCfg.MBSSID[apidx].bHideSsid = TRUE;								
-#ifdef WSC_V2_SUPPORT
-						pAd->ApCfg.MBSSID[apidx].WscControl.WscV2Info.bWpsEnable = FALSE;
-#endif /* WSC_V2_SUPPORT */
-					}
-					else /*Disable*/
-						pAd->ApCfg.MBSSID[apidx].bHideSsid = FALSE;								
+					ret = kstrtol(macptr, 10, &longtmp);
+					if (ret < 0)
+						return FALSE;
 
-					DBGPRINT(RT_DEBUG_TRACE, ("I/F(ra%d) HideSSID=%d\n", i, pAd->ApCfg.MBSSID[apidx].bHideSsid));
+#ifdef WSC_V2_SUPPORT
+					if (longtmp != 0) {
+
+						pAd->ApCfg.MBSSID[apidx].WscControl.WscV2Info.
+						    bWpsEnable = FALSE;
+					}
+#endif /* WSC_V2_SUPPORT */
+					pAd->ApCfg.MBSSID[apidx].hidden_ssid = longtmp;
+
+					DBGPRINT(RT_DEBUG_TRACE, ("I/F(ra%d) HideSSID=%d\n",
+						i, pAd->ApCfg.MBSSID[apidx].hidden_ssid));
 				}
 			}
 
@@ -3213,6 +3219,22 @@ NDIS_STATUS	RTMPSetProfileParameters(
 			}
 		}
 #endif /* CONFIG_AP_SUPPORT */
+
+#ifdef ED_MONITOR
+		/* common part for EDCCA config */
+		if (RTMPGetKeyParameter("EDCCA_ED_TH", tmpbuf, 32, pBuffer, TRUE)){
+			UINT8 count = simple_strtol(tmpbuf, 0, 10);
+			pAd->ed_threshold = count;
+			DBGPRINT(RT_DEBUG_TRACE, ("pAd->ed_threshold = %u\n", count));
+		}
+
+		if (RTMPGetKeyParameter("EDCCA_BLOCK_CHECK_TH", tmpbuf, 32, pBuffer, TRUE)){
+			UINT8 count = simple_strtol(tmpbuf, 0, 10);
+			pAd->ed_block_tx_threshold = count;
+			DBGPRINT(RT_DEBUG_TRACE, ("pAd->ed_block_tx_threshold = %u\n", count));
+		}
+#endif /* ED_MONITOR */
+
 
 		/*ShortSlot*/
 		if(RTMPGetKeyParameter("ShortSlot", tmpbuf, 10, pBuffer, TRUE))
@@ -4520,6 +4542,14 @@ NDIS_STATUS	RTMPSetProfileParameters(
 			Set_MO_FalseCCATh_Proc(pAd, tmpbuf);
 		}
 #endif /* MICROWAVE_OVEN_SUPPORT */
+
+#ifdef ED_MONITOR
+		if (RTMPGetKeyParameter("ED_CCA", tmpbuf, 10, pBuffer, TRUE)){
+			INT ed_chk = simple_strtol(tmpbuf, 0, 10);
+			pAd->ed_chk = (ed_chk > 0 ? TRUE : FALSE);
+		}
+#endif /* ED_MONITOR */
+
 #ifdef DYNAMIC_PD_SUPPORT
 		/*Set false CCA thredshold*/
 		if (RTMPGetKeyParameter("FCCA_THR1", tmpbuf, 10, pBuffer, TRUE))

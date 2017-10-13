@@ -294,11 +294,13 @@ INT	Set_Channel_Proc(
 #endif /* DOT11_N_SUPPORT */
 					rf_channel = pAd->CommonCfg.Channel;
 
+/*
 				AsicSwitchChannel(pAd, rf_channel, FALSE);
 				AsicLockChannel(pAd, rf_channel);
 				DBGPRINT(RT_DEBUG_TRACE, ("%s(): CtrlChannel(%d), CentralChannel(%d) \n", 
 							__FUNCTION__, pAd->CommonCfg.Channel,
 							pAd->CommonCfg.CentralChannel));
+*/
 			}
 		}
 #endif /* CONFIG_STA_SUPPORT */
@@ -382,6 +384,43 @@ INT	Set_Channel_Proc(
 
 	return success;
 }
+
+INT Set_Monitor_Channel_And_Bw(
+	IN	PRTMP_ADAPTER	pAd,
+	IN	PSTRING			arg)
+{
+	UINT16 Channel = 0;
+	CMD_RTPRIV_IOCTL_80211_CHAN ChanInfo;
+
+	Channel = simple_strtol(arg, 0, 10);
+	DBGPRINT(RT_DEBUG_TRACE, ("Set_monitor_channel::(Channel=%d)\n", Channel));
+	memset(&ChanInfo, 0, sizeof(ChanInfo));
+	ChanInfo.MonFilterFlag = 0x17f93;/*0x17f93 is a RX filter*/
+	ChanInfo.IfType = RT_CMD_80211_IFTYPE_MONITOR;
+
+	/*(XX -> HT20; 1XX -> NOTH; 2XX -> HT40 PLUS; 3XX -> HT40 MIN)*/
+	if ((Channel > 0) && (Channel <= 14)) {
+		ChanInfo.ChanType = RT_CMD_80211_CHANTYPE_HT20;
+		ChanInfo.ChanId = Channel;
+	} else if ((Channel > 100) && (Channel <= 114)) {
+		ChanInfo.ChanType = RT_CMD_80211_CHANTYPE_NOHT;
+		ChanInfo.ChanId = Channel - 100;
+	} else if ((Channel > 200) && (Channel <= 214)) {
+		ChanInfo.ChanType = RT_CMD_80211_CHANTYPE_HT40PLUS;
+		ChanInfo.ChanId = Channel - 200;
+	} else if ((Channel > 300) && (Channel <= 314)) {
+		ChanInfo.ChanType = RT_CMD_80211_CHANTYPE_HT40MINUS;
+		ChanInfo.ChanId = Channel - 300;
+	} else {
+		DBGPRINT(RT_DEBUG_TRACE, ("Set_monitor_channel::Wrong parameter Channel=%d!!!\n", Channel));
+		return -1;
+	}
+
+	/* set channel */
+	RTMP_DRIVER_80211_CHAN_SET(pAd, &ChanInfo);
+	return 0;
+}
+
 
 
 /* 

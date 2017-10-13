@@ -83,7 +83,7 @@ BOOLEAN BeaconTransmitRequired(
 */
 VOID APMakeBssBeacon(RTMP_ADAPTER *pAd, INT apidx)
 {
-	UCHAR DsLen = 1, SsidLen;
+	UCHAR DsLen = 1;
 	HEADER_802_11 BcnHdr;
 	LARGE_INTEGER FakeTimestamp;
 	ULONG FrameLen = 0;
@@ -99,11 +99,6 @@ VOID APMakeBssBeacon(RTMP_ADAPTER *pAd, INT apidx)
 		return;
 
 	PhyMode = pAd->ApCfg.MBSSID[apidx].PhyMode;
-
-	if (pAd->ApCfg.MBSSID[apidx].bHideSsid)
-		SsidLen = 0;
-	else
-		SsidLen = pAd->ApCfg.MBSSID[apidx].SsidLen;
 
 	MgtMacHeaderInit(pAd, &BcnHdr, SUBTYPE_BEACON, 0, BROADCAST_ADDR, 
 #ifdef P2P_SUPPORT
@@ -139,8 +134,8 @@ VOID APMakeBssBeacon(RTMP_ADAPTER *pAd, INT apidx)
 						2,                               &pAd->CommonCfg.BeaconPeriod,
 						2,                               &pAd->ApCfg.MBSSID[apidx].CapabilityInfo,
 						1,                               &SsidIe, 
-						1,                               &SsidLen, 
-						SsidLen,                       pAd->ApCfg.MBSSID[apidx].Ssid,
+						1,                               &pAd->ApCfg.MBSSID[apidx].SsidLen,
+						pAd->ApCfg.MBSSID[apidx].SsidLen, pAd->ApCfg.MBSSID[apidx].Ssid,
 						1,                               &SupRateIe, 
 						1,                               &SupRateLen,
 						SupRateLen,                 &SupRate, 
@@ -158,8 +153,8 @@ VOID APMakeBssBeacon(RTMP_ADAPTER *pAd, INT apidx)
 					2,                               &pAd->CommonCfg.BeaconPeriod,
 					2,                               &pAd->ApCfg.MBSSID[apidx].CapabilityInfo,
 					1,                               &SsidIe, 
-					1,                               &SsidLen, 
-					SsidLen,                         pAd->ApCfg.MBSSID[apidx].Ssid,
+					1,                               &pAd->ApCfg.MBSSID[apidx].SsidLen,
+					pAd->ApCfg.MBSSID[apidx].SsidLen, pAd->ApCfg.MBSSID[apidx].Ssid,
 					1,                               &SupRateIe, 
 					1,                               &SupRateLen,
 					SupRateLen,                      pAd->CommonCfg.SupRate, 

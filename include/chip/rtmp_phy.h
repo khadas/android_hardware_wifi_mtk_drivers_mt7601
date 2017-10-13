@@ -179,6 +179,7 @@
 #define BBP_R54			54
 #define BBP_R55			55
 #define BBP_R60			60
+#define BBP_R61			61
 #define BBP_R57			57
 #define BBP_R58			58
 #define BBP_R62			62 /* Rx SQ0 Threshold HIGH */
@@ -204,6 +205,7 @@
 #define BBP_R84			84
 #define BBP_R85			85
 #define BBP_R86			86
+#define BBP_R87			87
 #define BBP_R88			88
 #define BBP_R91			91
 #define BBP_R92			92

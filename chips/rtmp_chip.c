@@ -1035,6 +1035,14 @@ VOID RtmpChipOpsHook(VOID *pCB)
 	RtmpChipBcnInit(pAd);
 
 	pChipOps->RxSensitivityTuning = RxSensitivityTuning;
+
+	/* EDCCA */
+#ifdef ED_MONITOR
+	pChipOps->ChipSetEDCCA = MT7601_set_ed_cca;
+#else
+	pChipOps->ChipSetEDCCA = NULL;
+#endif /* ED_MONITOR */
+
 #ifdef CONFIG_STA_SUPPORT
 	pChipOps->ChipAGCAdjust = ChipAGCAdjust;
 #endif /* CONFIG_STA_SUPPORT */

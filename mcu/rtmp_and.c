@@ -1061,7 +1061,6 @@ static VOID DFSDetectRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 
 static VOID PBFMonitorRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 {
-#if 0
 	if ((*Data) == 0) {
 		/* Low threshold happens */
 		DBGPRINT(RT_DEBUG_TRACE, ("%s::enable TX Queue\n", __FUNCTION__));
@@ -1076,7 +1075,6 @@ static VOID PBFMonitorRspEventHandler(PRTMP_ADAPTER pAd, UCHAR *Data)
 	}
 	else
 		DBGPRINT(RT_DEBUG_TRACE, ("%s::no this command(%d)\n", __FUNCTION__, *Data));
-#endif
 }
 
 
@@ -2039,10 +2037,9 @@ error:
 
 #endif
 
-
 INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel, 
-					UINT32 ListenInterval, UINT32 PreTBTTLeadTime,
-					UINT8 TIMByteOffset, UINT8 TIMBytePattern)
+					UINT32 BeaconInterval, UINT32 WakeUpInterval,
+					UINT32 NextDTIMInterval, UINT8 not_used)
 {
 	struct CMD_UNIT CmdUnit;
 	CHAR *Pos, *Buf;
@@ -2053,10 +2050,9 @@ INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel,
 	/* Power operation and Power Level */
 	VarLen = 8;
 
-	if (PwrOP == RADIO_OFF_ADVANCE)
-	{
-		/* Listen interval, Pre-TBTT, TIM info */
-		VarLen += 12;
+	if (PwrOP == RADIO_OFF_ADVANCE) {
+		/* Power level, becaon interval, wake up interval, next DTIM interval */
+		VarLen += 28;
 	}
 
 	os_alloc_mem(pAd, (UCHAR **)&Buf, VarLen);
@@ -2073,26 +2069,29 @@ INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel,
 	NdisMoveMemory(Pos, &Value, 4);
 	Pos += 4;
 
-	if ( (PwrOP == RADIO_OFF_ADVANCE) || (PwrOP == RADIO_OFF_AUTO_WAKEUP))
-	{
-		/* Listen interval */
-		Value = cpu2le32(ListenInterval);
+	if (PwrOP == RADIO_OFF_ADVANCE) {
+		/* beacon interval */
+		Value = cpu2le32(BeaconInterval);
 		NdisMoveMemory(Pos, &Value, 4);
 		Pos += 4;
 
 
-		/* Pre TBTT lead time */
-		Value = cpu2le32(PreTBTTLeadTime);
+		/* wake up interval */
+		Value = cpu2le32(WakeUpInterval);
 		NdisMoveMemory(Pos, &Value, 4);
 		Pos += 4;
-	}
 
-	if (PwrOP == RADIO_OFF_ADVANCE)
-	{
-		/* TIM Info */
-		Value = (Value & ~0x000000ff) | TIMBytePattern;
-		Value = (Value & ~0x0000ff00) | (TIMByteOffset << 8);
-		Value = cpu2le32(Value);
+		Value = cpu2le32(NextDTIMInterval);
+		NdisMoveMemory(Pos, &Value, 4);
+		Pos += 4;
+
+		/* power saving connection mode */
+		Value = cpu2le32(1);
+		NdisMoveMemory(Pos, &Value, 4);
+		Pos += 4;
+
+		/* power saving wakeup time for P2PGO */
+		Value = cpu2le32(30);
 		NdisMoveMemory(Pos, &Value, 4);
 		Pos += 4;
 	}
@@ -2102,9 +2101,10 @@ INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel,
 	CmdUnit.u.ANDES.Type = CMD_POWER_SAVING_OP;
 	CmdUnit.u.ANDES.CmdPayloadLen = VarLen;
 	CmdUnit.u.ANDES.CmdPayload = Buf;
-	
+
 	CmdUnit.u.ANDES.NeedRsp = FALSE;
 	CmdUnit.u.ANDES.NeedWait = FALSE;
+
 	CmdUnit.u.ANDES.Timeout = 0;
 
 	Ret = AsicSendCmdToAndes(pAd, &CmdUnit);
@@ -2113,7 +2113,6 @@ INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel,
 
 	return NDIS_STATUS_SUCCESS;
 }
-
 
 INT AndesFunSetOP(PRTMP_ADAPTER pAd, UINT32 FunID, UINT32 Param)
 {

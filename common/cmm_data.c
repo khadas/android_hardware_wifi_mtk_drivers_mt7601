@@ -3465,7 +3465,7 @@ BOOLEAN RxDoneInterruptHandle(
 //#endif // CONFIG_AP_SUPPORT //
 	RXD_STRUC *pRxD;
 	UINT8 RXWISize = pAd->chipCap.RXWISize;
-	ULONG Now;
+
 #ifdef LINUX
 #endif // LINUX //
 
@@ -3545,16 +3545,14 @@ BOOLEAN RxDoneInterruptHandle(
 
 			CFG80211DRV_PrintFrameType(pAd, "RX", (PUCHAR)pHeader,  pRxWI->RxWIMPDUByteCnt);
 		}
-	
-		if ((pHeader->FC.Type == BTYPE_MGMT && (pHeader->FC.SubType == SUBTYPE_BEACON || pHeader->FC.SubType == SUBTYPE_PROBE_RSP)) &&
-                             NdisEqualMemory(pAd->CommonCfg.Bssid, pHeader->Addr2, MAC_ADDR_LEN))
+#if 0		
+		if (pHeader->FC.SubType == SUBTYPE_BEACON &&
+                             NdisEqualMemory(pAd->ApCfg.ApCliTab[0].CfgApCliBssid, pHeader->Addr2, MAC_ADDR_LEN))
 		{
-			NdisGetSystemUpTime(&Now);
-			pAd->StaCfg.LastBeaconRxTime = Now;
-//			printk("CfgApCliBssid: %02x:%02x:%02x:%02x:%02x:%02x, %02x:%02x:%02x:%02x:%02x:%02x\n",
-//				PRINT_MAC(pAd->CommonCfg.Bssid), PRINT_MAC(pHeader->Addr2));
-		
+			printk("CfgApCliBssid: %02x:%02x:%02x:%02x:%02x:%02x, %02x:%02x:%02x:%02x:%02x:%02x\n",
+				PRINT_MAC(pAd->ApCfg.ApCliTab[0].CfgApCliBssid), PRINT_MAC(pHeader->Addr2));
 		}
+#endif
 		if ( (pHeader->FC.Type == BTYPE_MGMT) && (pHeader->FC.SubType == SUBTYPE_DEAUTH) )
                 {
                        DBGPRINT(RT_DEBUG_TRACE,("Deauth: %02x:%02x:%02x:%02x:%02x:%02x, %02x:%02x:%02x:%02x:%02x:%02x\n",

@@ -364,9 +364,6 @@ BOOLEAN CFG80211DRV_PrintFrameType(
 BOOLEAN CFG80211_checkScanTable(
         IN VOID                                         *pAdCB);
 
-BOOLEAN CFG80211_checkStaScanTable(
-        IN VOID                                         *pAdCB);
-
 VOID CFG80211_P2pClientSendNullFrame(
     IN VOID                                     *pAdCB,
     IN INT                                       PwrMgmt);

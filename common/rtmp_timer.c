@@ -356,9 +356,9 @@ void RtmpTimerQExit(RTMP_ADAPTER *pAd)
 	os_free_mem(pAd, pAd->TimerQ.pTimerQPoll);
 	pAd->TimerQ.pQTail = NULL;
 	pAd->TimerQ.pQHead = NULL;
-/*#ifndef KTHREAD_SUPPORT*/
+#ifndef KTHREAD_SUPPORT
 	pAd->TimerQ.status = RTMP_TASK_STAT_STOPED;
-/*#endif*/
+#endif
 	RTMP_INT_UNLOCK(&pAd->TimerQLock, irqFlags);
 /*	NdisFreeSpinLock(&pAd->TimerQLock); */
 }

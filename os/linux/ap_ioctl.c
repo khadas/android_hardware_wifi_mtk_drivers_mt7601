@@ -87,10 +87,8 @@ struct iw_priv_args ap_privtab[] = {
 const struct iw_handler_def rt28xx_ap_iw_handler_def =
 {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33))
 	.private_args	= (struct iw_priv_args *) ap_privtab,
 	.num_private_args	= N(ap_privtab),
-#endif
 #if IW_HANDLER_VERSION >= 7
 	.get_wireless_stats = rt28xx_get_wireless_stats,
 #endif 

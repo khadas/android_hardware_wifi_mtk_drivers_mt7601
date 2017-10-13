@@ -176,7 +176,7 @@ void *RTMPQMemAddr(int size, int index, dma_addr_t *pDmaAddr, int type)
 			printk("Non-support memory type!!!!\n");
 			return NULL;		
 	}
-//	printk("%s[%d]\n",__FUNCTION__,idx);
+	printk("%s[%d]\n",__FUNCTION__,idx);
 	*pDmaAddr = PreAllocDmaAddr[idx];
 	return 	PreAllocBuffer[idx];
 } 

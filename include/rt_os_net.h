@@ -607,6 +607,9 @@ VOID RTMP_CFG80211_VirtualIF_Remove(
      RTMP_COM_IoctlHandle(__pAd, NULL, CMD_RTPRIV_IOCTL_80211_SCAN_STATUS_LOCK_INIT, 0, NULL, __isInit)
 #endif
 
+#define RTMP_DRIVER_80211_SCAN_EXTRA_IE_SET(__pAd)	\
+	RTMP_COM_IoctlHandle(__pAd, NULL, CMD_RTPRIV_IOCTL_80211_EXTRA_IES_SET,  0, NULL, 0)
+
 #define RTMP_DRIVER_80211_IBSS_JOIN(__pAd, __pInfo)						\
 	RTMP_COM_IoctlHandle(__pAd, NULL, CMD_RTPRIV_IOCTL_80211_IBSS_JOIN, 0, __pInfo, 0)
 #define RTMP_DRIVER_80211_STA_LEAVE(__pAd, __ifType)								\
@@ -786,5 +789,8 @@ VOID RTMP_CFG80211_VirtualIF_Remove(
 
 #define RTMP_DRIVER_ADAPTER_SET_ANDROID_RESUME_LOCK(__pAd, __flag)   \
               RTMP_COM_IoctlHandle(__pAd, NULL, CMD_RTPRIV_IOCTL_SET_ANDROID_RESUME_LOCK, 0, NULL, __flag)
+
+#define RTMP_DRIVER_SET_INIT_FLAG(__pAd, __flag) \
+	RTMP_COM_IoctlHandle(__pAd, NULL, CMD_RTPRIV_IOCTL_SET_INIT_FLAG, 0, NULL, __flag)
 #endif /* __RT_OS_NET_H__ */
 

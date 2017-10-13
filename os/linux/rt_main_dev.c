@@ -285,6 +285,7 @@ int rt28xx_open(VOID *dev)
 		   So the net_dev->priv will be NULL in 2rd open */
 		return -1;
 	}
+	RTMP_DRIVER_SET_INIT_FLAG(pAd, 1);
 
 	RTMP_DRIVER_MCU_SLEEP_CLEAR(pAd);	
 
@@ -310,6 +311,7 @@ int rt28xx_open(VOID *dev)
 		if (res)
 		{
 			DBGPRINT(RT_DEBUG_ERROR, (" %s: rt28xx_open autopm_resume fail ------\n", DRIVER_ROLE));
+			RTMP_DRIVER_SET_INIT_FLAG(pAd, 0);
 			return (-1);;
 		}			
 	}
@@ -336,17 +338,14 @@ int rt28xx_open(VOID *dev)
 /*	if (RT_DEV_PRIV_FLAGS_GET(net_dev) == INT_MAIN) */
 	if (RTMP_DRIVER_MAIN_INF_CHECK(pAd, RT_DEV_PRIV_FLAGS_GET(net_dev)) == NDIS_STATUS_SUCCESS)
 	{
-#ifdef CONFIG_WEXT_CONF
 #ifdef CONFIG_APSTA_MIXED_SUPPORT
 		if (OpMode == OPMODE_AP)
 			net_dev->wireless_handlers = (struct iw_handler_def *) &rt28xx_ap_iw_handler_def;
 #endif /* CONFIG_APSTA_MIXED_SUPPORT */
-
 #ifdef CONFIG_STA_SUPPORT
 		if (OpMode == OPMODE_STA)
 			net_dev->wireless_handlers = (struct iw_handler_def *) &rt28xx_iw_handler_def;
 #endif /* CONFIG_STA_SUPPORT */
-#endif
 	}
 #endif /* WIRELESS_EXT >= 12 */
 
@@ -407,6 +406,7 @@ int rt28xx_open(VOID *dev)
 	printk("Number of Packet Freed in open = %lu\n", OS_NumOfPktFree);
 #endif /* VENDOR_FEATURE2_SUPPORT */
 
+	RTMP_DRIVER_SET_INIT_FLAG(pAd, 0);
 	return (retval);
 
 err:
@@ -415,6 +415,7 @@ err:
 	RTMP_DRIVER_IRQ_RELEASE(pAd);
 /*---move from rt28xx_init() to here. */
 
+	RTMP_DRIVER_SET_INIT_FLAG(pAd, 0);
 	return (-1);
 }
 

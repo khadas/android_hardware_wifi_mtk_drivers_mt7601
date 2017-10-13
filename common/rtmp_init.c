@@ -347,6 +347,7 @@ NDIS_STATUS	RTMPAllocAdapterBlock(
 			pAd->ProbeRespIE[index].pIe = NULL;
 	}	
 
+	pAd->ext_flags = 0;
 	DBGPRINT_S(Status, ("<-- RTMPAllocAdapterBlock, Status=%x\n", Status));
 	return Status;
 }
@@ -393,13 +394,11 @@ VOID NICReadEEPROMParameters(RTMP_ADAPTER *pAd, PSTRING mac_addr)
 	{
 		pAd->chipOps.eeinit(pAd);
 #ifdef RTMP_EFUSE_SUPPORT
-#ifdef RALINK_ATE
 		if(!pAd->bFroceEEPROMBuffer && pAd->bEEPROMFile)
 		{
 			DBGPRINT(RT_DEBUG_OFF, ("--> NICReadEEPROMParameters::(Efuse)Load to EEPROM Buffer Mode\n"));	
 			eFuseLoadEEPROM(pAd);
 		}
-#endif /* RALINK_ATE */
 #endif /* RTMP_EFUSE_SUPPORT */
 	}
 
@@ -1367,7 +1366,15 @@ retry:
 		return NDIS_STATUS_FAILURE;
 	}
 
-
+#ifdef MT7601
+#ifdef ED_MONITOR
+	/*TODO: for certification only!*/
+#if 0
+	if (IS_MT7601(pAd)) 
+		MT7601_set_ed_cca(pAd, TRUE);
+#endif
+#endif /* ED_MONITOR */
+#endif /* MT7601 */
 
 	DBGPRINT(RT_DEBUG_TRACE, ("<-- NICInitializeAdapter\n"));
 	return Status;
@@ -2183,6 +2190,11 @@ VOID NICUpdateRawCounters(
 		pAd->RalinkCounters.OneSecFalseCCACnt = RxStaCnt1.field.FalseCca;
 		pAd->RalinkCounters.FalseCCACnt += RxStaCnt1.field.FalseCca;
 #endif /* MICROWAVE_OVEN_SUPPORT */
+
+#ifdef ED_MONITOR
+		if (pAd->ed_chk) /*no timer now, and the data may not correct before.*/
+			pAd->false_cca_stat[pAd->ed_stat_lidx] += RxStaCnt1.field.FalseCca;
+#endif /* ED_MONITOR */
 	}
 
 #ifdef STATS_COUNT_SUPPORT
@@ -3362,6 +3374,8 @@ VOID UserCfgInit(RTMP_ADAPTER *pAd)
 	pAd->WOW_Cfg.nSelectedGPIO = 1;
 	pAd->WOW_Cfg.nDelay = 3; /* (3+1)*3 = 12 sec */
 	pAd->WOW_Cfg.nHoldTime = 1; /* 1*10 = 10 ms */
+	NdisZeroMemory(pAd->WOW_Cfg.PTK, sizeof(pAd->WOW_Cfg.PTK));
+	NdisZeroMemory(pAd->WOW_Cfg.ReplayCounter, sizeof(pAd->WOW_Cfg.ReplayCounter));
 	DBGPRINT(RT_DEBUG_OFF, ("WOW Enable %d, WOWFirmware %d\n", pAd->WOW_Cfg.bEnable, pAd->WOW_Cfg.bWOWFirmware));
 #endif /* (defined(WOW_SUPPORT) && defined(RTMP_MAC_USB)) || defined(NEW_WOW_SUPPORT) */
 
@@ -3396,6 +3410,14 @@ VOID UserCfgInit(RTMP_ADAPTER *pAd)
 		pAd->CommonCfg.MO_Cfg.bEnable = FALSE;
 	pAd->CommonCfg.MO_Cfg.nFalseCCATh = MO_FALSE_CCA_TH;
 #endif /* MICROWAVE_OVEN_SUPPORT */
+
+#ifdef ED_MONITOR
+		pAd->ed_chk = FALSE;
+		pAd->ed_chk_period = 100;
+		pAd->ed_threshold = 90;
+		pAd->ed_block_tx_threshold = 2;
+#endif /* ED_MONITOR */
+
 	DBGPRINT(RT_DEBUG_TRACE, ("<-- UserCfgInit\n"));
 }
 
@@ -3966,7 +3988,6 @@ INT RtmpRaDevCtrlInit(VOID *pAdSrc, RTMP_INF_TYPE infType)
 #ifdef CONFIG_STA_SUPPORT
 	pAd->OpMode = OPMODE_STA;
 	DBGPRINT(RT_DEBUG_OFF, ("STA Driver version-%s\n", STA_DRIVER_VERSION));
-//	DBGPRINT(RT_DEBUG_OFF, ("Compile time-%s,%s\n", __DATE__, __TIME__));
 #endif /* CONFIG_STA_SUPPORT */
 
 #ifdef CONFIG_AP_SUPPORT

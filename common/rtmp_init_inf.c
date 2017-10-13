@@ -945,6 +945,19 @@ VOID RTMPDrvOpen(
 	/* WSC hardware push button function 0811 */
 	WSC_HDR_BTN_Init(pAd);
 #endif /* WSC_INCLUDED */
+
+#ifdef ED_MONITOR
+{
+	BOOLEAN bEdcca = FALSE;
+
+	bEdcca = GetEDCCASupport(pAd);
+
+	if (bEdcca){
+		ed_monitor_init(pAd);
+	}
+}
+#endif /* ED_MONITOR */
+
 }
 
 
@@ -1213,6 +1226,13 @@ VOID RTMPDrvClose(
 	/* release all timers */
 	RTMPusecDelay(2000);
 	RTMP_AllTimerListRelease(pAd);
+
+#ifdef ED_MONITOR
+	if (pAd->ed_chk){
+		DBGPRINT(RT_DEBUG_ERROR, ("@@@ %s: go to ed_monitor_exit()!!\n", __FUNCTION__));
+		ed_monitor_exit(pAd);
+	}
+#endif /* ED_MONITOR */
 
 #ifdef RTMP_TIMER_TASK_SUPPORT
 	NdisFreeSpinLock(&pAd->TimerQLock);

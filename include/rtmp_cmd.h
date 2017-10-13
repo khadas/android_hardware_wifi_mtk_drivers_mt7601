@@ -349,6 +349,7 @@ typedef enum _CMD_RTPRIV_IOCTL_COMMON {
 #endif
 	CMD_RTPRIV_IOCTL_SET_ANDROID_RESUME_LOCK,
 
+	CMD_RTPRIV_IOCTL_SET_INIT_FLAG,
 	/* can not exceed 0xa000 */
 	CMD_RTPRIV_IOCTL_80211_COM_LATEST_ONE,
 } CMD_RTPRIV_IOCTL_COMMON;
@@ -389,6 +390,7 @@ typedef struct __CMD_RTPRIV_IOCTL_80211_BEACON {
 	UCHAR *probe_resp;
 	UINT32 probe_resp_len;
 	ULONG ssid_len;
+	const UCHAR *ssid;
 	UCHAR hidden_ssid;
 	struct cfg80211_crypto_settings crypto;
 	BOOLEAN privacy;
@@ -726,6 +728,7 @@ typedef struct __RT_CMD_STA_IOCTL_SCAN {
 	IN UCHAR FlgScanThisSsid;
 	IN UINT32 SsidLen;
 	IN CHAR *pSsid;
+	IN UINT ScanType;
 	OUT INT32 Status;
 } RT_CMD_STA_IOCTL_SCAN;
 
@@ -789,6 +792,7 @@ typedef struct __RT_CMD_STA_IOCTL_SECURITY {
 #define RT_CMD_STA_IOCTL_SECURITY_ALG_WEP		0x02
 #define RT_CMD_STA_IOCTL_SECURITY_ALG_TKIP		0x03
 #define RT_CMD_STA_IOCTL_SECURITY_ALG_CCMP		0x04
+
 	IN UINT32 Alg;
 
 #define RT_CMD_STA_IOCTL_SECURTIY_EXT_SET_TX_KEY	0x01

@@ -61,7 +61,7 @@
 
 #ifdef MT7601
 #define EFUSE_EEPROM_DEFULT_FILE	"MT7601EEPROM.bin"
-#define EFUSE_BUFFER_PATH			"/var/lib/share/MT7601/MT7601EEPROM.bin"
+#define EFUSE_BUFFER_PATH			"/etc/firmware/MT7601EEPROM.bin"
 #define MAX_EEPROM_BIN_FILE_SIZE	512
 #endif /* MT7601 */
 
@@ -1424,9 +1424,7 @@ int rtmp_ee_efuse_read16(
 {
 
 	if (pAd->bFroceEEPROMBuffer
-#ifdef RALINK_ATE
 			||pAd->bEEPROMFile
-#endif /* RALINK_ATE */
 		)
 	{
 	    DBGPRINT(RT_DEBUG_TRACE,  ("Read from EEPROM Buffer\n"));
@@ -1445,9 +1443,7 @@ int rtmp_ee_efuse_write16(
 	IN USHORT data)
 {
     if (pAd->bFroceEEPROMBuffer
-#ifdef RALINK_ATE
 			||pAd->bEEPROMFile
-#endif /* RALINK_ATE */
 		)
     {
     	data = le2cpu16(data);

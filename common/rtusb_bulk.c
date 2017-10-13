@@ -1357,6 +1357,9 @@ VOID	RTUSBKickBulkOut(
 {
 	/* BulkIn Reset will reset whole USB PHY. So we need to make sure fRTMP_ADAPTER_BULKIN_RESET not flaged.*/
 	if (!RTMP_TEST_FLAG(pAd ,fRTMP_ADAPTER_NEED_STOP_TX)
+#ifdef NEW_WOW_SUPPORT
+	    && (!((pAd->WOW_Cfg.bInSuspendMode) & WOW_SUSPEND_COMPLETE))
+#endif
 #ifdef RALINK_ATE			
 		&& !(ATE_ON(pAd))
 #endif /* RALINK_ATE */

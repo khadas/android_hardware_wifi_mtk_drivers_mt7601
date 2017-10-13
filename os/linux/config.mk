@@ -15,8 +15,8 @@ HAS_CONFIG_P2P_AUTO_GO_AS_SOFTAP=n
 HAS_XLINK=n
 
 # Support WSC function
-HAS_WSC=n
-HAS_WSC_V2=n
+HAS_WSC=y
+HAS_WSC_V2=y
 HAS_WSC_LED=n
 HAS_IWSC_SUPPORT=n
 
@@ -48,6 +48,9 @@ HAS_DFS_SUPPORT=n
 
 #Support Carrier-Sense function
 HAS_CS_SUPPORT=n
+
+#Support EDCCA monitor
+HAS_ED_MONITOR_SUPPORT=y
 
 #Support CE customers BBP NOISE ENDURANCE settings
 HAS_CE_BBP_NOISE_ENDURANCE_SUPPORT=n
@@ -228,11 +231,12 @@ HAS_IWSC_SUPPORT=n
 HAS_CFG80211_SUPPORT=y
 HAS_P2P_SUPPORT=y
 HAS_CONFIG_P2P_AUTO_GO_AS_SOFTAP=n
-HAS_NEW_WOW_SUPPORT=n
+HAS_NEW_WOW_SUPPORT=y
 HAS_MULTI_CHANNEL=n
 HAS_USB_BULK_BUF_ALIGMENT=y
 HAS_USB_BULK_BUF_PREALLOC=y
 HAS_WOW_IFDOWN_SUPPORT=n
+HAS_SUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES=y
 endif
 
 ifeq ($(PLATFORM),HISILICON)
@@ -349,6 +353,10 @@ ifeq ($(HAS_CS_SUPPORT),y)
 WFLAGS += -DCARRIER_DETECTION_SUPPORT
 endif
 
+ifeq ($(HAS_ED_MONITOR_SUPPORT),y)
+WFLAGS += -DED_MONITOR
+endif
+
 ifeq ($(HAS_MCAST_RATE_SPECIFIC_SUPPORT), y)
 WFLAGS += -DMCAST_RATE_SPECIFIC
 endif
@@ -408,7 +416,7 @@ endif
 
 
 ifeq ($(HAS_CFG80211_SUPPORT),y)
-WFLAGS += -DRT_CFG80211_SUPPORT -DEXT_BUILD_CHANNEL_LIST
+WFLAGS += -DRT_CFG80211_SUPPORT
 ifeq ($(HAS_RFKILL_HW_SUPPORT),y)
 WFLAGS += -DRFKILL_HW_SUPPORT
 endif
@@ -571,7 +579,7 @@ WFLAGS += -DUSB_FIRMWARE_MULTIBYTE_WRITE -DMULTIWRITE_BYTES=4
 endif
 
 ifeq ($(HAS_CFG80211_SUPPORT),y)
-WFLAGS += -DRT_CFG80211_SUPPORT -DEXT_BUILD_CHANNEL_LIST
+WFLAGS += -DRT_CFG80211_SUPPORT
 ifeq ($(HAS_RFKILL_HW_SUPPORT),y)
 WFLAGS += -DRFKILL_HW_SUPPORT
 endif
@@ -630,6 +638,14 @@ endif
 
 ifeq ($(HAS_NEW_WOW_SUPPORT),y)
 WFLAGS += -DNEW_WOW_SUPPORT
+endif
+
+ifeq ($(HAS_ED_MONITOR_SUPPORT),y)
+WFLAGS += -DED_MONITOR
+endif
+
+ifeq ($(HAS_SUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES),y)
+WFLAGS += -DSUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES
 endif
 
 endif
@@ -995,7 +1011,7 @@ CHIPSET_DAT = 2860
 endif
 
 
-ifneq ($(findstring 7601U,$(CHIPSET)),)
+ifneq ($(findstring 7601u,$(CHIPSET)),)
 WFLAGS += -DMT7601U -DMT7601 -DRLT_MAC -DRLT_RF -DRTMP_MAC_USB -DRTMP_USB_SUPPORT -DRTMP_TIMER_TASK_SUPPORT -DRX_DMA_SCATTER -DVCORECAL_SUPPORT -DRTMP_EFUSE_SUPPORT -DNEW_MBSSID_MODE -DRTMP_INTERNAL_TX_ALC -DCONFIG_ANDES_SUPPORT 
 #WFLAGS += -DMT7601U -DMT7601 -DRLT_MAC -DRLT_RF -DRTMP_MAC_USB -DRTMP_USB_SUPPORT -DRTMP_TIMER_TASK_SUPPORT -DRX_DMA_SCATTER -DVCORECAL_SUPPORT -DNEW_MBSSID_MODE -DRTMP_INTERNAL_TX_ALC -DCONFIG_ANDES_SUPPORT
 ifneq ($(findstring $(RT28xx_MODE),AP),)
@@ -1488,7 +1504,6 @@ ifeq ($(PLATFORM),NXP_TV550)
         EXTRA_CFLAGS := $(WFLAGS)
     endif
 endif
-
 
 ifeq ($(PLATFORM),PANDA)
 EXTRA_CFLAGS += -I$(LINUX_SRC)/include -I$(RT28xx_DIR)/include -I$(LINUX_SRC)/arch/arm/include -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=7 -march=armv7-a -fno-pic -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack $(WFLAGS)

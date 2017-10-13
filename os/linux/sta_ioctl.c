@@ -190,8 +190,8 @@ struct iw_priv_args privtab[] = {
 #endif /* WSC_STA_SUPPORT */
 #ifdef CONFIG_ELIAN_SUPPORT
 { RTPRIV_IOCTL_MSC_CTRL,
-  IW_PRIV_TYPE_CHAR | 12, IW_PRIV_TYPE_CHAR | 150,
-  "elian"},
+	IW_PRIV_TYPE_CHAR | 20, IW_PRIV_TYPE_CHAR | 150,
+	"elian"},
 #endif
 };
 
@@ -816,6 +816,8 @@ int rt_ioctl_siwscan(struct net_device *dev,
 	pIoctlScan->SsidLen = req->essid_len;
 	pIoctlScan->pSsid = (CHAR *)(req->essid);
 #endif
+	pIoctlScan->ScanType = req->scan_type;
+	DBGPRINT(RT_DEBUG_OFF, ("pIoctlScan->ScanType=%d\n", pIoctlScan->ScanType));
 #endif /* WPA_SUPPLICANT_SUPPORT */
 	RTMP_STA_IoctlHandle(pAd, NULL, CMD_RTPRIV_IOCTL_STA_SIOCSIWSCAN, 0,
 							pIoctlScan, 0, RT_DEV_PRIV_FLAGS_GET(dev));
@@ -1092,7 +1094,6 @@ int rt_ioctl_giwscan(struct net_device *dev,
 		/*Encyption key */
 		/*================================ */
 	{
-		char tmp[17] = {0};
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWENCODE;
 		iwe.u.data.length = 16;
@@ -1102,8 +1103,9 @@ int rt_ioctl_giwscan(struct net_device *dev,
 			iwe.u.data.flags = IW_ENCODE_DISABLED;
 
 		previous_ev = current_ev;
-		memcpy(tmp, pIoctlScan->MainSharedKey[(iwe.u.data.flags & IW_ENCODE_INDEX)-1], 16);
-		current_ev = IWE_STREAM_ADD_POINT(info, current_ev, end_buf,&iwe, tmp);
+		memset(&custom[0], 0, MAX_CUSTOM_LEN);
+		memcpy(custom, pIoctlScan->MainSharedKey[(iwe.u.data.flags&IW_ENCODE_INDEX) - 1], 16);
+		current_ev = IWE_STREAM_ADD_POINT(info, current_ev, end_buf, &iwe, custom);
 		if (current_ev == previous_ev)
 		{
 #if WIRELESS_EXT >= 17
@@ -1369,6 +1371,7 @@ int rt_ioctl_giwessid(struct net_device *dev,
 			 struct iw_point *data, char *essid)
 {
 	VOID *pAd = NULL;
+	char _ssid[IW_ESSID_MAX_SIZE+1] = {};
 	RT_CMD_STA_IOCTL_SSID IoctlEssid, *pIoctlEssid = &IoctlEssid;
 
 	GET_PAD_FROM_NET_DEV(pAd, dev);
@@ -1391,13 +1394,15 @@ int rt_ioctl_giwessid(struct net_device *dev,
 	data->flags = 1;
 
 
-	pIoctlEssid->pSsid = (CHAR *)essid;
+	pIoctlEssid->pSsid = (CHAR *)_ssid;
 	pIoctlEssid->Status = 0;
 	RTMP_STA_IoctlHandle(pAd, NULL, CMD_RTPRIV_IOCTL_STA_SIOCGIWESSID, 0,
 						pIoctlEssid, 0, RT_DEV_PRIV_FLAGS_GET(dev));
 	data->length = pIoctlEssid->SsidLen;
 
 	RT_CMD_STATUS_TRANSLATE(pIoctlEssid->Status);
+	if (copy_to_user(essid, _ssid, min(data->length, (UINT16)(strlen(_ssid)+1))))
+		pIoctlEssid->Status = -EFAULT;
 	return pIoctlEssid->Status;
 }
 
@@ -2116,6 +2121,16 @@ int rt_ioctl_giwauth(struct net_device *dev,
 	return 0;
 }
 
+#ifdef WPA_SUPPLICANT_SUPPORT
+#ifdef NEW_WOW_SUPPORT
+#ifndef IW_ENCODE_ALG_KCK
+#define IW_ENCODE_ALG_KCK	6
+#endif
+#ifndef IW_ENCODE_ALG_KEK
+#define IW_ENCODE_ALG_KEK	7
+#endif
+#endif /* NEW_WOW_SUPPORT*/
+#endif /* WPA_SUPPLICANT_SUPPORT */
 
 int rt_ioctl_siwencodeext(struct net_device *dev,
 			   struct iw_request_info *info,
@@ -2512,7 +2527,7 @@ static const iw_handler rt_priv_handlers[] = {
 #ifndef CONFIG_AP_SUPPORT
 	(iw_handler) rt_ioctl_setparam, /* + 0x02 */
 #else
-	(iw_handler) NULL, /* + 0x02 */
+	(iw_handler) rt_ioctl_setparam, /* + 0x02 */
 #endif /* CONFIG_AP_SUPPORT */
 #ifdef DBG	
 	(iw_handler) rt_private_ioctl_bbp, /* + 0x03 */	
@@ -2555,12 +2570,10 @@ const struct iw_handler_def rt28xx_iw_handler_def =
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
 	.standard	= (iw_handler *) rt_handler,
 	.num_standard	= sizeof(rt_handler) / sizeof(iw_handler),
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33))
 	.private	= (iw_handler *) rt_priv_handlers,
 	.num_private		= N(rt_priv_handlers),
 	.private_args	= (struct iw_priv_args *) privtab,
 	.num_private_args	= N(privtab),
-#endif
 #if IW_HANDLER_VERSION >= 7
     .get_wireless_stats = rt28xx_get_wireless_stats,
 #endif 

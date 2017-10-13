@@ -132,7 +132,7 @@ INT AndesBBPRandomWrite(PRTMP_ADAPTER pAd, UINT32 Num, ...);
 INT AndesFunSetOP(PRTMP_ADAPTER pAd, UINT32 FunID, UINT32 Param);
 INT AndesPwrSavingOP(PRTMP_ADAPTER pAd, UINT32 PwrOP, UINT32 PwrLevel, 
 					UINT32 ListenInterval, UINT32 PreTBTTLeadTime,
-					UINT8 TIMByteOffset, UINT8 TIMBytePattern);
+					UINT32 TIMByteOffset, UINT8 TIMBytePattern);
 INT AndesCalibrationOP(PRTMP_ADAPTER, UINT32 CalibrationID, UINT32 Param);
 BOOLEAN IsInBandCmdProcessing(PRTMP_ADAPTER pAd);
 UCHAR GetCmdRspNum(PRTMP_ADAPTER pAd);

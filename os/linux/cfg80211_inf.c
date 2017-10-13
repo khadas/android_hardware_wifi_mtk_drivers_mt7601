@@ -389,7 +389,10 @@ VOID RTMP_CFG80211_VirtualIF_Init(
 #endif /* P2P_ODD_MAC_ADJUST */
 		pNetDevOps->devAddr[5] += FIRST_MBSSID;
 	}		
-	
+
+	/* Shared p2p mac address is not allow for original wpa_supplicant */
+	pNetDevOps->devAddr[0] ^= 1 << 2;
+
 	switch (DevType)
 	{
 		case RT_CMD_80211_IFTYPE_MONITOR:
@@ -509,7 +512,7 @@ VOID RTMP_CFG80211_VirtualIF_Remove(
 		RTMP_CFG80211_RemoveVifEntry(pAd, dev_p);
 		RTMP_OS_NETDEV_STOP_QUEUE(dev_p);
 		
-		cfg80211_disconnected(dev_p, 0, NULL, 0, GFP_KERNEL);		
+		kalCfg80211Disconnected(dev_p, 0, NULL, 0, TRUE, GFP_KERNEL);
 		synchronize_rcu();
 		if (isGoOn)
 		{
@@ -532,7 +535,15 @@ VOID RTMP_CFG80211_VirtualIF_Remove(
 		{
 			RtmpOSNetDevDetach(dev_p);
 		}
-		
+
+		/* Restore p2p mac address */
+		if (!RTMP_CFG80211_VIF_P2P_GO_ON(pAd) && !RTMP_CFG80211_VIF_P2P_CLI_ON(pAd)) {
+			COPY_MAC_ADDR(pAd->cfg80211_ctrl.P2PCurrentAddress,
+				pAd->dummy_p2p_net_dev->dev_addr);
+			DBGPRINT(RT_DEBUG_TRACE, ("%s(): P2PCurrentAddress %X:%X:%X:%X:%X:%X\n",
+				__func__, PRINT_MAC(pAd->cfg80211_ctrl.P2PCurrentAddress)));
+		}
+
 		if (dev_p->ieee80211_ptr)
 		{
 			kfree(dev_p->ieee80211_ptr);
@@ -771,7 +782,13 @@ VOID RTMP_CFG80211_DummyP2pIf_Init(
 	}
 
 	RTMP_OS_NETDEV_SET_PRIV(new_dev_p, pAd);
+
+	/* Set local administration bit for unique mac address of p2p0 */
 	NdisMoveMemory(&pNetDevOps->devAddr[0], &pAd->CurrentAddress[0], MAC_ADDR_LEN);
+	pNetDevOps->devAddr[0] += 2;
+	COPY_MAC_ADDR(pAd->cfg80211_ctrl.P2PCurrentAddress, pNetDevOps->devAddr);
+	AsicSetBssid(pAd, pAd->cfg80211_ctrl.P2PCurrentAddress);
+
 	pNetDevOps->needProtcted = TRUE;
 	
 	pWdev = kzalloc(sizeof(*pWdev), GFP_KERNEL);

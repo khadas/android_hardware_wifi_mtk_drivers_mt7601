@@ -927,6 +927,13 @@ NTSTATUS    RTUSB_VendorRequest(
 		return NDIS_STATUS_FAILURE;
 	}
 
+#ifdef NEW_WOW_SUPPORT
+	if (pAd->WOW_Cfg.bInSuspendMode & WOW_SUSPEND_COMPLETE) {
+		DBGPRINT(RT_DEBUG_INFO, ("[%s] Block Vendor Request\n", __func__));
+		return NDIS_STATUS_FAILURE;
+	}
+#endif /* NEW_WOW_SUPPORT */
+
 #ifdef CONFIG_STA_SUPPORT
 #ifdef CONFIG_PM
 #ifdef USB_SUPPORT_SELECTIVE_SUSPEND
@@ -958,6 +965,12 @@ NTSTATUS    RTUSB_VendorRequest(
 		if (RET != 0)
 		{
 			DBGPRINT(RT_DEBUG_ERROR, ("UsbVendorReq_semaphore get failed\n"));
+			/* M* mts 0698613, system may want to sleep
+			   and raise EINTR to supplicant. Workaround solution*/
+			if ((RET == -EINTR) &&
+				RTMP_TEST_EXT_FLAG(pAd, fRTMP_ADAPTER_EXT_INIT_ONGOING)) {
+				RTMP_SET_FLAG(pAd, fRTMP_ADAPTER_NIC_NOT_EXIST);
+			}
 			return NDIS_STATUS_FAILURE;
 		}
 
@@ -1111,6 +1124,11 @@ static NTSTATUS ResetBulkOutHdlr(IN PRTMP_ADAPTER pAd, IN PCmdQElmt CMDQelmt)
 	{
 		if(RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_NIC_NOT_EXIST))
 			break;
+
+#ifdef NEW_WOW_SUPPORT
+		if (pAd->WOW_Cfg.bInSuspendMode & WOW_SUSPEND_COMPLETE)
+			break;
+#endif
 
 		RTUSBReadMACRegister(pAd, TXRXQ_PCNT, &MACValue);
 		if ((MACValue & 0xf00000/*0x800000*/) == 0)
@@ -1777,12 +1795,6 @@ static NTSTATUS RT_Mac80211_ConnResultInfom(IN PRTMP_ADAPTER pAd, IN PCmdQElmt C
 {
 #ifdef CONFIG_STA_SUPPORT
 	//yiwei cfg
-//	if(!CFG80211_checkScanResInKernelCache(pAd,pAd->MlmeAux.Bssid,pAd->MlmeAux.Ssid,pAd->MlmeAux.SsidLen)) {
-//		DBGPRINT(RT_DEBUG_TRACE, ("RT_Mac80211_ConnResultInfom bss not found \n"));
-//		RT_CFG80211_CONN_RESULT_INFORM(pAd, pAd->MlmeAux.Bssid, NULL, 0,
-  //                                                          NULL, 0, 0);
-//	} else 
-	CFG80211_checkStaScanTable(pAd);
 	RT_CFG80211_CONN_RESULT_INFORM(pAd,
 								pAd->MlmeAux.Bssid,
 								/*CMDQelmt->buffer, CMDQelmt->bufferlength,*/

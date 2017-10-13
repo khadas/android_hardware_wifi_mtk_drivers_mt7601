@@ -670,13 +670,7 @@ VOID MlmeJoinReqAction(
 #endif /* P2P_SUPPORT */
 
 	DBGPRINT(RT_DEBUG_TRACE, ("SYNC - MlmeJoinReqAction(BSS #%ld)\n", pInfo->BssIdx));
-	if (RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_BSS_SCAN_IN_PROGRESS) ||pAd->FlgCfg80211Scanning) {
-		DBGPRINT(RT_DEBUG_TRACE, ("!!! reset mlme for scan busy issue !!!\n"));
-#ifdef RT_CFG80211_SUPPORT			
-		CFG80211OS_ScanEnd(pAd->pCfg80211_CB, TRUE);
-#endif
-		RTMPResumeMsduTransmission(pAd);
-	}
+
 #ifdef CONFIG_PM
 #ifdef USB_SUPPORT_SELECTIVE_SUSPEND
 
@@ -2013,8 +2007,14 @@ VOID PeerBeacon(
 
 
 		/* ignore BEACON not for my SSID */
-		if ((!is_my_ssid) && (!is_my_bssid))
+		if ((!is_my_ssid) && (!is_my_bssid)){
+#ifdef ED_MONITOR
+			if (pAd->ed_chk && INFRA_ON(pAd)){
+				;  /*also update my scan table, even this not for me*/
+			}else
+#endif /* ED_MONITOR */
 			goto LabelOK;
+		}
 
 		/* It means STA waits disassoc completely from this AP, ignores this beacon. */
 		if (pAd->Mlme.CntlMachine.CurrState == CNTL_WAIT_DISASSOC)

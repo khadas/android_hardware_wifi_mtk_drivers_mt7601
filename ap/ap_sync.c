@@ -136,10 +136,12 @@ VOID APPeerProbeReqAction(
 
 		PhyMode = pAd->ApCfg.MBSSID[apidx].PhyMode;
 
-		if (((SsidLen == 0) && (! pAd->ApCfg.MBSSID[apidx].bHideSsid)) ||
+		if (((SsidLen == 0) &&
+			(pAd->ApCfg.MBSSID[apidx].hidden_ssid == NL80211_HIDDEN_SSID_NOT_IN_USE)) ||
 #ifdef WSC_AP_SUPPORT
             /* buffalo WPS testbed STA send ProbrRequest ssid length = 32 and ssid are not AP , but DA are AP. for WPS test send ProbeResponse */
-			((SsidLen == 32) && MAC_ADDR_EQUAL(Addr3, pAd->ApCfg.MBSSID[apidx].Bssid) && (pAd->ApCfg.MBSSID[apidx].bHideSsid == 0)) ||
+			((SsidLen == 32) && MAC_ADDR_EQUAL(Addr3, pAd->ApCfg.MBSSID[apidx].Bssid) &&
+			(pAd->ApCfg.MBSSID[apidx].hidden_ssid == NL80211_HIDDEN_SSID_NOT_IN_USE)) ||
 #endif /* WSC_AP_SUPPORT */
 #ifdef P2P_SUPPORT
 			(NdisEqualMemory(Ssid, &WILDP2PSSID[0], WILDP2PSSIDLEN)) ||

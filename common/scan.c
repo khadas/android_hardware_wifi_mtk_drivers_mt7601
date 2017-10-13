@@ -172,6 +172,10 @@ static INT scan_active(RTMP_ADAPTER *pAd, UCHAR OpMode, UCHAR ScanType)
 #ifdef CONFIG_STA_SUPPORT
 	USHORT Status;
 #endif /* CONFIG_STA_SUPPORT */
+#ifdef P2P_SUPPORT
+	UCHAR SupRate[MAX_LEN_OF_SUPPORTED_RATES];
+	UCHAR SupRateLen = 0;
+#endif /* P2P_SUPPORT */
 
 
 	if (MlmeAllocateMemory(pAd, &frm_buf) != NDIS_STATUS_SUCCESS)
@@ -208,21 +212,20 @@ static INT scan_active(RTMP_ADAPTER *pAd, UCHAR OpMode, UCHAR ScanType)
 #ifdef WSC_STA_SUPPORT
 		|| ((ScanType == SCAN_WSC_ACTIVE) && (OpMode == OPMODE_STA))
 #endif /* WSC_STA_SUPPORT */
+#ifdef P2P_SUPPORT
+		|| (ScanType == SCAN_P2P)
+#endif /* P2P_SUPPORT */
 		)
 		SsidLen = pAd->MlmeAux.SsidLen;
 
 #ifdef P2P_SUPPORT
-	if ((pAd->MlmeAux.ScanType == SCAN_P2P) || (pAd->MlmeAux.ScanType == SCAN_P2P_SEARCH)
-#ifdef P2P_APCLI_SUPPORT
-		 || ((pAd->MlmeAux.ScanType == SCAN_WSC_ACTIVE) && (OpMode == OPMODE_AP) && (P2P_CLI_ON(pAd)))
-#endif /* P2P_APCLI_SUPPORT */
-	)
-	{
-		PRT_P2P_CONFIG pP2PCtrl = &pAd->P2pCfg;
-		UCHAR		SupRate[MAX_LEN_OF_SUPPORTED_RATES];
-		UCHAR		SupRateLen = 0;
+	if (ScanType == SCAN_P2P) {
+		DBGPRINT(RT_DEBUG_INFO,
+			("%s: p2p scan from cfg80211, %X:%X:%X:%X:%X:%X for probe req\n",
+			__func__, PRINT_MAC(pAd->cfg80211_ctrl.P2PCurrentAddress)));
+		MgtMacHeaderInit(pAd, &Hdr80211, SUBTYPE_PROBE_REQ, 0, BROADCAST_ADDR,
+			pAd->cfg80211_ctrl.P2PCurrentAddress, BROADCAST_ADDR);
 
-		SsidLen = WILDP2PSSIDLEN; /* Use Wildword SSID */
 		SupRate[0]	= 0x8C;    /* 6 mbps, in units of 0.5 Mbps, basic rate */
 		SupRate[1]	= 0x12;    /* 9 mbps, in units of 0.5 Mbps */
 		SupRate[2]	= 0x98;    /* 12 mbps, in units of 0.5 Mbps, basic rate */
@@ -232,22 +235,17 @@ static INT scan_active(RTMP_ADAPTER *pAd, UCHAR OpMode, UCHAR ScanType)
 		SupRate[6]	= 0x60;    /* 48 mbps, in units of 0.5 Mbps */
 		SupRate[7]	= 0x6c;    /* 54 mbps, in units of 0.5 Mbps */
 		SupRateLen	= 8;
-		/* P2P scan must use P2P mac address. */
-		MgtMacHeaderInit(pAd, &Hdr80211, SUBTYPE_PROBE_REQ, 0, BROADCAST_ADDR,
-							pP2PCtrl->CurrentAddress,
-							BROADCAST_ADDR);
 
-		MakeOutgoingFrame(frm_buf,				&FrameLen,
-							sizeof(HEADER_802_11),	&Hdr80211,
-							1,						&SsidIe,
-							1,						&SsidLen,
-							SsidLen,					&WILDP2PSSID[0],
-							1,						&SupRateIe,
-							1,						&SupRateLen,
-							SupRateLen, 			SupRate, 
-							END_OF_ARGS);
-	}
-	else
+		MakeOutgoingFrame(frm_buf,	&FrameLen,
+			sizeof(HEADER_802_11),	&Hdr80211,
+			1,						&SsidIe,
+			1,						&SsidLen,
+			SsidLen,				pAd->MlmeAux.Ssid,
+			1,						&SupRateIe,
+			1,						&SupRateLen,
+			SupRateLen,				SupRate,
+			END_OF_ARGS);
+	} else
 #endif /* P2P_SUPPORT */
 	{
 #ifdef CONFIG_AP_SUPPORT

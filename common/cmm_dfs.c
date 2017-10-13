@@ -2081,6 +2081,16 @@ static VOID DfsCheckBusyIdle(
 	busy_delta = pRadarDetect->busy_time - pRadarDetect->ch_busy_sta[pRadarDetect->ch_busy_sta_index];
 	idle_delta = pRadarDetect->idle_time - pRadarDetect->ch_idle_sta[pRadarDetect->ch_busy_sta_index];
 
+#ifdef ED_MONITOR
+		if (pAd->ed_chk == TRUE){
+			ULONG irqflags;
+			RTMP_IRQ_LOCK(&pAd->irq_lock, irqflags);
+			pAd->ch_busy_stat[pAd->ed_stat_lidx] += pRadarDetect->busy_time;
+			pAd->ch_idle_stat[pAd->ed_stat_lidx] += pRadarDetect->idle_time;
+			RTMP_IRQ_UNLOCK(&pAd->irq_lock, irqflags);
+		}
+#endif /* ED_MONITOR  */
+
 	if (busy_delta < 0)
 	{
 		busy_delta = ~busy_delta;

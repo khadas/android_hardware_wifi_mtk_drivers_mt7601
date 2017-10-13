@@ -161,7 +161,7 @@ typedef struct usb_ctrlrequest devctrlrequest;
 #else
 #define STA_PROFILE_PATH			"/system/etc/wifi/RT2870STA_7601.dat"
 #endif
-#define STA_DRIVER_VERSION			"JEDI.L0.MP1.mt7601u.v1.2"
+#define STA_DRIVER_VERSION			"JEDI.MP1.mt7601u.v1.8"
 #define DRIVER_ROLE			"STA"
 #ifdef MULTIPLE_CARD_SUPPORT
 #define CARD_INFO_PATH			"/etc/Wireless/RT2870STA/RT2870STACard.dat"

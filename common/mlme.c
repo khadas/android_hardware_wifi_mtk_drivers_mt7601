@@ -1008,7 +1008,13 @@ VOID MlmePeriodicExec(
 
 #ifdef RTMP_FREQ_CALIBRATION_SUPPORT
 #ifdef CONFIG_STA_SUPPORT
-	if (pAd->chipCap.FreqCalibrationSupport)
+	if (pAd->chipCap.FreqCalibrationSupport
+#if defined(NEW_WOW_SUPPORT)
+		/* Should not run calibration-related stuff in suspend/WoW mode. */
+		&& !(RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING)
+		|| RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDED))
+#endif /* NEW_WOW_SUPPORT */
+	)
 	{
 		if ((pAd->FreqCalibrationCtrl.bEnableFrequencyCalibration == TRUE) && 
 		     (INFRA_ON(pAd)))
@@ -1312,6 +1318,12 @@ VOID MlmePeriodicExec(
 		P2pPeriodicExec(SystemSpecific1, FunctionContext, SystemSpecific2, SystemSpecific3);
 #endif /* P2P_SUPPORT */
 
+#ifdef ED_MONITOR
+	if (pAd->ed_chk){
+		ed_status_read(pAd);
+	}
+#endif /* ED_MONITOR */
+
 #ifdef DYNAMIC_PD_SUPPORT
 	
 	  RTMPAcsRssi(pAd, &pAd->ApCfg.RssiSample);
@@ -1341,26 +1353,6 @@ VOID DynamicPDPeriodicExec(
 /*0. Dynamic vga is disable*/
 if(!pAd->CommonCfg.bDynaPDEnable)
   return;
-
-#ifdef ED_MONITOR
-	/* if enable edcca && ed_tx_stoped is true,restore vga to default value */
-	/* because edcca & pdcca cannot implement concurrently */
-//        if ((pAd->ed_chk == TRUE) && (pAd->ed_tx_stoped == TRUE))
-  if (pAd->ed_chk == TRUE)
-	{
-#ifdef DOT11_N_SUPPORT
-		pAd->CommonCfg.bRdg = FALSE;
-#endif /* DOT11_N_SUPPORT */
-		goto undo_dynamicVGA;
-//		return;
-	}
-	else
-	{
-#ifdef DOT11_N_SUPPORT
-		pAd->CommonCfg.bRdg = TRUE;
-#endif /* DOT11_N_SUPPORT */
-	}
-#endif /* ED_MONITOR */
 
 #ifdef P2P_SUPPORT
     if (P2P_CLI_ON(pAd) || P2P_GO_ON(pAd)
@@ -1412,13 +1404,6 @@ if(!pAd->CommonCfg.bDynaPDEnable)
 #endif /* ANT_DIVERSITY_SUPPORT */
 #endif /*ANTI_NOISE_PD_SUPPORT*/
         MT7601_dynamic_vga_tuning(pAd);
-	return;
-		
-#ifdef ED_MONITOR
-undo_dynamicVGA:
-#endif
-
-	MT7601_dynamic_vga_reset_default(pAd);
     }
 }
 #endif /*DYNAMIC_PD_SUPPORT*/
@@ -1460,9 +1445,6 @@ VOID STAMlmePeriodicExec(
 	ULONG			    TxTotalCnt;
 	int 	i;
 	BOOLEAN bCheckBeaconLost = TRUE;
-#ifdef PBF_MONITOR_SUPPORT
-    UINT32 mac_reg = 0;
-#endif
 #ifdef CONFIG_PM
 #ifdef USB_SUPPORT_SELECTIVE_SUSPEND	
 	POS_COOKIE  pObj = (POS_COOKIE) pAd->OS_Cookie;
@@ -1550,6 +1532,14 @@ VOID STAMlmePeriodicExec(
 		if (pAd->Cfg80211RocTimerRunning)
 					bCheckBeaconLost = FALSE;
 
+#if defined(NEW_WOW_SUPPORT) && defined(RT_CFG80211_SUPPORT)
+		/* Disable Beacon loss check during suspend */
+		if (RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING) ||
+		    RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDED)) {
+			/* DBGPRINT(RT_DEBUG_TRACE,("Skip beacon lost checking during suspend")); */
+			bCheckBeaconLost = FALSE;
+		}
+#endif
 
 		if (bCheckBeaconLost)
 		{
@@ -1565,13 +1555,20 @@ VOID STAMlmePeriodicExec(
 	if (!RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_BSS_SCAN_IN_PROGRESS)) 
 	{
 		AsicAdjustTxPower(pAd);
+#ifdef NEW_WOW_SUPPORT
+		/* Should not perform tssi when starting suspend.
+		*  This prevents from sending TSSI bulkout commands to FW when
+		*  suspend is started and is under processing.
+		*/
+		if (!RTMP_TEST_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING))
+#endif /* NEW_WOW_SUPPORT */
 		RTMP_CHIP_ASIC_TEMPERATURE_COMPENSATION(pAd);
 	}
 
 #ifdef PBF_MONITOR_SUPPORT
-//	UINT32 mac_reg = 0;
+	UINT32 mac_reg = 0;
 	RTMP_IO_READ32(pAd, TXRXQ_PCNT, &mac_reg);
-	DBGPRINT(RT_DEBUG_TRACE, ("%s : TXRXQ_PCNT=0x%08x\n", DRIVER_ROLE, mac_reg));
+	DBGPRINT(RT_DEBUG_OFF, ("%s : TXRXQ_PCNT=0x%08x\n", DRIVER_ROLE, mac_reg));
 
 	if (((mac_reg & 0xFF0000) >> 16) == 0) {
 		DBGPRINT(RT_DEBUG_TRACE, ("%s : %s::enable TX Queue\n", DRIVER_ROLE, __FUNCTION__));
@@ -2562,8 +2559,7 @@ VOID MlmeCalculateChannelQuality(
 	ULONG ChannelQuality = 0;  /* 0..100, Channel Quality Indication for Roaming*/
 #ifdef CONFIG_STA_SUPPORT
 	ULONG LastBeaconRxTime = 0;
-//	ULONG BeaconLostTime = pAd->StaCfg.BeaconLostTime;
-	ULONG BeaconLostTime =2000;
+	ULONG BeaconLostTime = pAd->StaCfg.BeaconLostTime;
 #endif /* CONFIG_STA_SUPPORT */
 
 #ifdef CONFIG_STA_SUPPORT
@@ -2643,7 +2639,7 @@ VOID MlmeCalculateChannelQuality(
 		(OneSecTxNoRetryOkCount < 2) && /* no heavy traffic*/
 		RTMP_TIME_AFTER(Now32, LastBeaconRxTime + BeaconLostTime))
 	{
-		DBGPRINT(RT_DEBUG_TRACE, ("BEACON lost > %ld msec with TxOkCnt=%ld -> CQI=0\n", BeaconLostTime* (1000 / OS_HZ) , TxOkCnt)); 
+		DBGPRINT(RT_DEBUG_TRACE, ("BEACON lost > %ld msec with TxOkCnt=%ld -> CQI=0\n", BeaconLostTime * (1000 / OS_HZ) , TxOkCnt)); 
 		ChannelQuality = 0;
 	}
 	else
@@ -3551,6 +3547,25 @@ ULONG BssTableSearch(
 	}
 	return (ULONG)BSS_NOT_FOUND;
 }
+
+/*edcca same channel ap count*/
+/* get ap counts from some channel*/
+#ifdef ED_MONITOR
+ULONG BssChannelAPCount(
+	IN BSS_TABLE * Tab, 
+	IN UCHAR Channel) 
+{
+	UCHAR i;
+	ULONG ap_count = 0;
+
+	for (i = 0; i < Tab->BssNr; i++) {
+		if (Tab->BssEntry[i].Channel == Channel){
+		ap_count++; 
+		}
+	}
+	return ap_count;
+}
+#endif /* ED_MONITOR */
 
 ULONG BssSsidTableSearch(
 	IN BSS_TABLE *Tab, 
@@ -5492,8 +5507,10 @@ VOID	MlmeRestartStateMachine(
 	if (!P2P_GO_ON(pAd) && (pApCliEntry->Valid == FALSE))
 #endif /* P2P_SUPPORT */
 	{
-	AsicSwitchChannel(pAd, pAd->CommonCfg.Channel, FALSE);
-	AsicLockChannel(pAd, pAd->CommonCfg.Channel);
+		if (!MONITOR_ON(pAd)) {
+			AsicSwitchChannel(pAd, pAd->CommonCfg.Channel, FALSE);
+			AsicLockChannel(pAd, pAd->CommonCfg.Channel);
+		}
 	}
 
 	/* Resume MSDU which is turned off durning scan*/

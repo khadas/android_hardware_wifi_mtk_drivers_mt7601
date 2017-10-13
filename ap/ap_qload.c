@@ -603,6 +603,17 @@ VOID QBSS_LoadUpdate(
 	{
 		/* in 20MHz, no need to check busy time of secondary channel */
 		RTMP_IO_READ32(pAd, CH_BUSY_STA_SEC, &BusyTime);
+
+#ifdef ED_MONITOR
+		if (pAd->ed_chk == TRUE){
+			ULONG irqflags;
+
+			RTMP_IRQ_LOCK(&pAd->irq_lock, irqflags);
+			pAd->ed_2nd_stat[pAd->ed_stat_lidx] += BusyTime;
+			RTMP_IRQ_UNLOCK(&pAd->irq_lock, irqflags);
+		}
+#endif /* ED_MONITOR  */
+
 		pAd->QloadLatestChannelBusyTimeSec = BusyTime;
 
 #ifdef QLOAD_FUNC_BUSY_TIME_STATS
@@ -635,6 +646,16 @@ VOID QBSS_LoadUpdate(
 
 	/* do busy time statistics for primary channel */
 	RTMP_IO_READ32(pAd, CH_BUSY_STA, &BusyTime);
+#ifdef ED_MONITOR
+	if (pAd->ed_chk == TRUE){
+		ULONG irqflags;
+	
+		RTMP_IRQ_LOCK(&pAd->irq_lock, irqflags);
+		pAd->ch_busy_stat[pAd->ed_stat_lidx] += BusyTime;
+		RTMP_IRQ_UNLOCK(&pAd->irq_lock, irqflags);
+		}
+#endif /* ED_MONITOR  */
+
 	pAd->QloadLatestChannelBusyTimePri = BusyTime;
 
 #ifdef QLOAD_FUNC_BUSY_TIME_STATS

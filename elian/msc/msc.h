@@ -4,6 +4,7 @@
 
 #include "core.h"
 
+#define MSC_RESULT_BUFFER_SIZE 256
 typedef void (*msc_evt_cb)(unsigned int eid);
 
 struct msc_param {

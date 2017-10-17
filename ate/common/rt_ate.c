@@ -214,7 +214,7 @@ VOID DefaultATEAsicAdjustTxPower(
 	UCHAR desiredTSSI = 0, currentTSSI = 0;
 	const TX_POWER_TUNING_ENTRY_STRUCT *TxPowerTuningTable = pAd->chipCap.TxPowerTuningTable_2G;
 	PTX_POWER_TUNING_ENTRY_STRUCT pTxPowerTuningEntry = NULL;
-	UCHAR RFValue = 0, TmpValue = 0;   
+//	UCHAR RFValue = 0, TmpValue = 0;   
 #endif /* RTMP_INTERNAL_TX_ALC */
 
 	maxTxPwrCnt = pChipStruct->maxTxPwrCnt;
@@ -306,7 +306,7 @@ VOID DefaultATEAsicAdjustTxPower(
 			}
 
 			/* Valid pAd->TxPowerCtrl.idxTxPowerTable: -30 ~ 45 */
-			pTxPowerTuningEntry = &TxPowerTuningTable[pAd->TxPowerCtrl.idxTxPowerTable + TX_POWER_TUNING_ENTRY_OFFSET]; /* zero-based array */
+			*pTxPowerTuningEntry = TxPowerTuningTable[pAd->TxPowerCtrl.idxTxPowerTable + TX_POWER_TUNING_ENTRY_OFFSET]; /* zero-based array */
 			pAd->TxPowerCtrl.RF_TX_ALC = pTxPowerTuningEntry->RF_TX_ALC;
 			pAd->TxPowerCtrl.MAC_PowerDelta = pTxPowerTuningEntry->MAC_PowerDelta;
 
@@ -4301,7 +4301,7 @@ INT Set_ATE_Load_E2P_From_Buf_Proc(
 	if (value > 0)
 	{
 
-		rt_ee_write_all(pAd, pAd->EEPROMImage);
+		rt_ee_write_all(pAd, (USHORT *)pAd->EEPROMImage);
 		ret = TRUE;
 	
 	}
@@ -6265,8 +6265,8 @@ VOID ATEPeriodicExec(
 
 		/* for performace enchanement */
 		NdisZeroMemory(&pAd->RalinkCounters,
-						(UINT32)&pAd->RalinkCounters.OneSecEnd -
-						(UINT32)&pAd->RalinkCounters.OneSecStart);
+						&pAd->RalinkCounters.OneSecEnd -
+						&pAd->RalinkCounters.OneSecStart);
         NICUpdateRawCounters(pAd);
 
 		if (pATEInfo->bRxFER == 1)

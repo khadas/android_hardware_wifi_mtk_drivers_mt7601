@@ -39,7 +39,7 @@ typedef struct _ATE_CHIP_STRUCT {
 	VOID	(*AsicSetTxRxPath)(PRTMP_ADAPTER pAd);
 	VOID	(*AdjustTxPower)(PRTMP_ADAPTER pAd);
 	VOID	(*AsicExtraPowerOverMAC)(PRTMP_ADAPTER pAd);
-	VOID 	(*TemperCompensation)(PRTMP_ADAPTER *pAd);
+	VOID 	(*TemperCompensation)(PRTMP_ADAPTER pAd);
 	
 	/* command handlers */
 	INT		(*Set_BW_Proc)(PRTMP_ADAPTER pAd, PSTRING arg);

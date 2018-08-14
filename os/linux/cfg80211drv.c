@@ -1511,7 +1511,8 @@ VOID CFG80211_UpdateBeacon(
 		BeaconTransmit.field.MODE = MODE_OFDM; /* Use 6Mbps */
 	else
 		BeaconTransmit.field.MODE = MODE_CCK;
-		BeaconTransmit.field.MCS = MCS_RATE_6;
+
+	BeaconTransmit.field.MCS = MCS_RATE_6;
 #ifdef CONFIG_P2P_AUTO_GO_AS_SOFTAP
 	}
 #endif
@@ -2655,6 +2656,14 @@ VOID CFG80211DRV_P2pClientKeyAdd(
 			if (pApCliEntry->WepStatus == Ndis802_11Encryption3Enabled)
 			{
 				printk("APCLI: Set AES Security Set. [%d] (GROUP) %d\n", BssIdx, pKeyInfo->KeyLen);
+				if (!memcmp(pApCliEntry->SharedKey[pKeyInfo->KeyId].Key,
+					pKeyInfo->KeyBuf, LEN_TK)) {
+					DBGPRINT(RT_DEBUG_OFF, ("%s skip reinstall gtk\n",
+						 __func__));
+					goto skip_reinstall_gtk;
+				}
+				pMacEntry->rx_ccmp_pn_bmc[pKeyInfo->KeyId] = 0;
+				pMacEntry->rx_ccmp_pn_bmc_zero[pKeyInfo->KeyId] = TRUE;
 				NdisZeroMemory(&pApCliEntry->SharedKey[pKeyInfo->KeyId], sizeof(CIPHER_KEY));  
 				pApCliEntry->SharedKey[pKeyInfo->KeyId].KeyLen = LEN_TK;
 				NdisMoveMemory(pApCliEntry->SharedKey[pKeyInfo->KeyId].Key, pKeyInfo->KeyBuf, pKeyInfo->KeyLen);
@@ -2669,7 +2678,7 @@ VOID CFG80211DRV_P2pClientKeyAdd(
 										  pKeyInfo->KeyId, 
 										  pApCliEntry->SharedKey[pKeyInfo->KeyId].CipherAlg, 
 										  NULL);				
-										  
+skip_reinstall_gtk:
 				if (pMacEntry->AuthMode >= Ndis802_11AuthModeWPA)
 				{
 					/* set 802.1x port control */
@@ -2683,6 +2692,13 @@ VOID CFG80211DRV_P2pClientKeyAdd(
 			if(pMacEntry)
 			{
 				printk("APCLI: Set AES Security Set. [%d] (PAIRWISE) %d\n", BssIdx, pKeyInfo->KeyLen);
+				if (!memcmp(pMacEntry->PairwiseKey.Key,
+					pKeyInfo->KeyBuf, LEN_TK)) {
+					DBGPRINT(RT_DEBUG_OFF, ("%s skip reinstall ptk\n",
+						 __func__));
+					goto skip_reinstall_ptk;
+				}
+				pMacEntry->rx_ccmp_pn_uc = 0;
 				NdisZeroMemory(&pMacEntry->PairwiseKey, sizeof(CIPHER_KEY));  
 				pMacEntry->PairwiseKey.KeyLen = LEN_TK;
 				
@@ -2693,6 +2709,8 @@ VOID CFG80211DRV_P2pClientKeyAdd(
 				
 				AsicAddPairwiseKeyEntry(pAd, (UCHAR)pMacEntry->Aid, &pMacEntry->PairwiseKey);
 				RTMPSetWcidSecurityInfo(pAd, BssIdx, 0, pMacEntry->PairwiseKey.CipherAlg, pMacEntry->Aid, PAIRWISEKEYTABLE);
+skip_reinstall_ptk:
+				;
 			}
 			else	
 			{
@@ -2857,7 +2875,7 @@ BOOLEAN CFG80211DRV_P2pClientConnect(
 	/* Set authentication mode */
 	if (pConnInfo->WpaVer == 2)
 	{
-		if (!pConnInfo->FlgIs8021x == TRUE) 
+		if (!(pConnInfo->FlgIs8021x == TRUE)) 
 		{
 			DBGPRINT(RT_DEBUG_TRACE,("APCLI WPA2PSK\n"));
 			Set_ApCli_AuthMode_Proc(pAd, "WPA2PSK");
@@ -3300,9 +3318,10 @@ VOID CFG80211_LostApInform(
 {
 
 	PRTMP_ADAPTER pAd = (PRTMP_ADAPTER)pAdCB;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0))
+#if KERNEL_VERSION(3, 11, 0) > LINUX_VERSION_CODE
 	CFG80211_CB *p80211CB = pAd->pCfg80211_CB;
 #endif
+
 	pAd->StaCfg.bAutoReconnect = FALSE;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0))
 	DBGPRINT(RT_DEBUG_TRACE, ("80211> CFG80211_LostApInform ==> %d\n", 

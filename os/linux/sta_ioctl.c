@@ -30,6 +30,7 @@
 
 #define RTMP_MODULE_OS
 
+#include "rt_config.h"
 #include "rtmp_comm.h"
 #include "rt_os_util.h"
 #include "rt_os_net.h"
@@ -2314,6 +2315,7 @@ int rt_ioctl_giwgenie(struct net_device *dev,
 	return 0;
 }
 
+
 int rt_ioctl_siwpmksa(struct net_device *dev,
 			   struct iw_request_info *info,
 			   union iwreq_data *wrqu,
@@ -2527,7 +2529,7 @@ static const iw_handler rt_priv_handlers[] = {
 #ifndef CONFIG_AP_SUPPORT
 	(iw_handler) rt_ioctl_setparam, /* + 0x02 */
 #else
-	(iw_handler) rt_ioctl_setparam, /* + 0x02 */
+	(iw_handler) NULL, /* + 0x02 */
 #endif /* CONFIG_AP_SUPPORT */
 #ifdef DBG	
 	(iw_handler) rt_private_ioctl_bbp, /* + 0x03 */	
@@ -2570,10 +2572,12 @@ const struct iw_handler_def rt28xx_iw_handler_def =
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
 	.standard	= (iw_handler *) rt_handler,
 	.num_standard	= sizeof(rt_handler) / sizeof(iw_handler),
+#if defined(CONFIG_WEXT_PRIV) || LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
 	.private	= (iw_handler *) rt_priv_handlers,
 	.num_private		= N(rt_priv_handlers),
 	.private_args	= (struct iw_priv_args *) privtab,
 	.num_private_args	= N(privtab),
+#endif /* CONFIG_WEXT_PRIV || LINUX_VERSION_CODE <= 2.6.32 */
 #if IW_HANDLER_VERSION >= 7
     .get_wireless_stats = rt28xx_get_wireless_stats,
 #endif 

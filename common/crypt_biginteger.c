@@ -170,7 +170,7 @@ VOID BigInteger_Init (
     if (*pBI != NULL)
         BigInteger_Free(pBI);
 
-	os_alloc_mem(NULL, (UCHAR **)pBI, sizeof(BIG_INTEGER));
+    os_alloc_mem(NULL, (UCHAR **)pBI, sizeof(BIG_INTEGER));
 /*    if ((*pBI = (PBIG_INTEGER) kmalloc(sizeof(BIG_INTEGER), GFP_ATOMIC)) == NULL) { */
     if (*pBI == NULL) {
         DEBUGPRINT("BigInteger_Init: allocate %zu bytes memory failure.\n", (sizeof(BIG_INTEGER)));

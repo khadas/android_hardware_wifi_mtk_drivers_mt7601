@@ -1310,16 +1310,30 @@ if (0) {
 	/* skip USB frame length field*/
 	pData += RXDMA_FIELD_SIZE;
 #ifdef RLT_MAC
-	pRxInfo = (RXINFO_STRUC *)pData;
-	pRxFceInfo = (RXFCE_INFO *)(pData + ThisFrameLen);
+	do {
+		struct _RXWI_OMAC *rxwi_n;
 
-	pData += RXINFO_SIZE;
+		pRxInfo = (RXINFO_STRUC *)pData;
+		pRxFceInfo = (RXFCE_INFO *)(pData + ThisFrameLen);
+
+		pData += RXINFO_SIZE;
+
+		rxwi_n = (struct _RXWI_OMAC *)pData;
+		pRxBlk->pRxWI = (RXWI_STRUC *) pData;
+		pRxBlk->wcid = rxwi_n->wcid;
+		pRxBlk->DataSize = rxwi_n->MPDUtotalByteCnt;
+		pRxBlk->key_idx = rxwi_n->key_idx;
+		pRxBlk->bss_idx = rxwi_n->bss_idx;
+		pRxBlk->ccmp_pn = 0;
+		pRxBlk->ccmp_pn_valid = FALSE;
+	} while (0);
 #endif /* RLT_MAC */
 #ifdef RTMP_MAC
 	pRxInfo = (RXINFO_STRUC *)(pData + ThisFrameLen);
 #endif /* RTMP_MAC */
 
 	pRxWI = (RXWI_STRUC *)pData;
+
 
 #ifdef RT_BIG_ENDIAN
 	RTMPWIEndianChange(pAd, pData, TYPE_RXWI);

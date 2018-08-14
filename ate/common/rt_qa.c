@@ -87,11 +87,6 @@ NDIS_STATUS TXSTOP(
 
 	/* Abort Tx, RX DMA. */
 	RtmpDmaEnable(pAd, 0);
-	while (pAd->PendingRx > 0)
-	{
-		ATE_RTUSBCancelPendingBulkInIRP(pAd);
-		RtmpOsMsDelay(500);
-	}
 
 	while (((pAd->BulkOutPending[0] == TRUE) ||
 			(pAd->BulkOutPending[1] == TRUE) || 
@@ -107,7 +102,8 @@ NDIS_STATUS TXSTOP(
 		RtmpOsMsDelay(500);
 	}
 
-	ASSERT(pAd->PendingRx == 0);
+	if (pAd->PendingRx)
+		DBGPRINT(RT_DEBUG_ERROR, ("pAd->PendingRx = %d\n", pAd->PendingRx));
 
 	/* Enable Tx, Rx DMA. */
 	RtmpDmaEnable(pAd, 1);
@@ -160,12 +156,6 @@ NDIS_STATUS RXSTOP(
 	/* Abort Tx, RX DMA. */
 	RtmpDmaEnable(pAd, 0);
 
-	while (pAd->PendingRx > 0)
-	{
-		ATE_RTUSBCancelPendingBulkInIRP(pAd);
-		RtmpOsMsDelay(500);
-	}
-
 	while (((pAd->BulkOutPending[0] == TRUE) ||
 			(pAd->BulkOutPending[1] == TRUE) || 
 			(pAd->BulkOutPending[2] == TRUE) ||
@@ -180,7 +170,9 @@ NDIS_STATUS RXSTOP(
 		RtmpOsMsDelay(500);
 	}
 
-	ASSERT(pAd->PendingRx == 0);
+	if (pAd->PendingRx)
+		DBGPRINT(RT_DEBUG_ERROR, ("pAd->PendingRx = %d\n", pAd->PendingRx));
+
 	pAd->ContinBulkIn = FALSE;
 #endif /* RTMP_MAC_USB */
 
@@ -1626,11 +1618,17 @@ static  INT DO_RACFG_CMD_ATE_E2PROM_READ_BULK(
 {
 	USHORT offset;
 	USHORT len;
-	USHORT buffer[EEPROM_SIZE >> 1];
-	
+	USHORT *buffer = NULL;
+
 	offset = OS_NTOHS(pRaCfg->status);
 	memcpy(&len, pRaCfg->data, 2);
 	len = OS_NTOHS(len);
+
+	os_alloc_mem(NULL, (UCHAR **) &buffer, EEPROM_SIZE);
+	if (buffer == NULL) {
+		DBGPRINT_ERR(("%s - Error for allocate size %d\n", __func__, EEPROM_SIZE));
+		return NDIS_STATUS_FAILURE;
+	}
 	
 	rt_ee_read_all(pAd, (USHORT *)buffer);
 
@@ -1640,6 +1638,7 @@ static  INT DO_RACFG_CMD_ATE_E2PROM_READ_BULK(
 		DBGPRINT_ERR(("%s : exceed EEPROM size\n", __FUNCTION__));
 
 	ResponseToGUI(pRaCfg, wrq, sizeof(pRaCfg->status)+len, NDIS_STATUS_SUCCESS);
+	os_free_mem(NULL, buffer);
 
 	return NDIS_STATUS_SUCCESS;
 }
@@ -1652,11 +1651,17 @@ static  INT DO_RACFG_CMD_ATE_E2PROM_WRITE_BULK(
 {
 	USHORT offset;
 	USHORT len;
-	USHORT buffer[EEPROM_SIZE >> 1];
+	USHORT *buffer = NULL;
 	
 	offset = OS_NTOHS(pRaCfg->status);
 	memcpy(&len, pRaCfg->data, 2);
 	len = OS_NTOHS(len);
+
+	os_alloc_mem(NULL, (UCHAR **) &buffer, EEPROM_SIZE);
+	if (buffer == NULL) {
+		DBGPRINT_ERR(("%s - Error for allocate size %d\n", __func__, EEPROM_SIZE));
+		return NDIS_STATUS_FAILURE;
+	}
 
 	memcpy_exs(pAd, (UCHAR *)buffer + offset, (UCHAR *)pRaCfg->data + 2, len);
 
@@ -1673,6 +1678,7 @@ static  INT DO_RACFG_CMD_ATE_E2PROM_WRITE_BULK(
 	}
 
 	ResponseToGUI(pRaCfg, wrq, sizeof(pRaCfg->status), NDIS_STATUS_SUCCESS);
+	os_free_mem(NULL, buffer);
 
 	return NDIS_STATUS_SUCCESS;
 }

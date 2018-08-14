@@ -923,7 +923,7 @@ INT Set_EncrypType_Proc(
     else
         return FALSE;
 
-	if (pAd->StaCfg.BssType == BSS_ADHOC)
+    if (pAd->StaCfg.BssType == BSS_ADHOC)
 	{
 		/* Build all corresponding channel information */
 		RTMPSetPhyMode(pAd, pAd->CommonCfg.cfg_wmode);
@@ -4764,7 +4764,8 @@ INT RTMPSetInformation(
 	case RT_OID_USB_POWER_SAVING:
 		if (Set_UsbPowerSaving(pAd, NULL) != TRUE)
 			Status = -EFAULT;
-			break;
+
+		break;
 
         default:
             DBGPRINT(RT_DEBUG_TRACE, ("Set::unknown IOCTL's subcmd = 0x%08x\n", cmd));
@@ -7347,7 +7348,7 @@ RtmpIoctl_rt_ioctl_siwfreq(
     else
         return NDIS_STATUS_FAILURE;
 
-	return NDIS_STATUS_SUCCESS;
+    return NDIS_STATUS_SUCCESS;
 }
 
 
@@ -8576,6 +8577,15 @@ void fnSetCipherKey(
     IN  BOOLEAN         bGTK,
     IN  UCHAR			*pKey)
 {
+	MAC_TABLE_ENTRY *pEntry = &pAd->MacTab.Content[BSSID_WCID];
+
+	/* This function is used only for TKIP/CCMP */
+	if (!memcmp(pAd->SharedKey[BSS0][keyIdx].Key, pKey, LEN_TK)) {
+		DBGPRINT(RT_DEBUG_OFF, ("%s skip reinstall key\n", __func__));
+		/* skip same key reinstall */
+		return;
+	}
+
     NdisZeroMemory(&pAd->SharedKey[BSS0][keyIdx], sizeof(CIPHER_KEY));
     pAd->SharedKey[BSS0][keyIdx].KeyLen = LEN_TK;
     NdisMoveMemory(pAd->SharedKey[BSS0][keyIdx].Key, pKey, LEN_TK);
@@ -8600,6 +8610,7 @@ void fnSetCipherKey(
 	        	NdisMoveMemory(pEntry->PairwiseKey.TxMic, pAd->SharedKey[BSS0][keyIdx].TxMic, LEN_TKIP_MIC);
 	        	pEntry->PairwiseKey.CipherAlg = pAd->SharedKey[BSS0][keyIdx].CipherAlg;
 
+				pEntry->rx_ccmp_pn_uc = 0;
 			/* Add Pair-wise key to Asic */
 		    	AsicAddPairwiseKeyEntry(
 		        pAd, 
@@ -8612,9 +8623,14 @@ void fnSetCipherKey(
 									pEntry->PairwiseKey.CipherAlg,
 									(UCHAR)pEntry->Aid, 
 									PAIRWISEKEYTABLE);		
+			DBGPRINT(RT_DEBUG_TRACE, ("install PTK %d\n", keyIdx));
 	}
 	else
 	{
+		DBGPRINT(RT_DEBUG_TRACE, ("install GTK %d\n", keyIdx));
+		pEntry->rx_ccmp_pn_bmc[keyIdx] = 0;
+		pEntry->rx_ccmp_pn_bmc_zero[keyIdx] = TRUE;
+
 			pAd->StaCfg.DefaultKeyId = keyIdx;
 		    	/* Update group key information to ASIC Shared Key Table */
 			AsicAddSharedKeyEntry(pAd, 
@@ -9264,14 +9280,14 @@ RtmpIoctl_rt_ioctl_giwrate(
     if (rate_index >= rate_count)
         rate_index = rate_count-1;
 
-	if(rate_index >= rate_count)
-	{
+    if(rate_index >= rate_count) {
 		ASSERT(0);
 		return NDIS_STATUS_FAILURE;
-	}
-	*(ULONG *)pData = ralinkrate[rate_index] * 500000;
+    }
 
-	return NDIS_STATUS_SUCCESS;
+    *(ULONG *)pData = ralinkrate[rate_index] * 500000;
+
+    return NDIS_STATUS_SUCCESS;
 }
 
 
@@ -9883,7 +9899,7 @@ RtmpIoctl_rt_private_get_statistics(
 	else
 		sprintf(mode_str, "PBC -");
 	
-		sprintf(extra+strlen(extra), "WPS Information(Driver Auto-Connect is %s - %d):\n",
+	sprintf(extra+strlen(extra), "WPS Information(Driver Auto-Connect is %s - %d):\n",
 	                                                  pAd->StaCfg.WscControl.WscDriverAutoConnect ? "Enabled":"Disabled",
 	                                                  pAd->StaCfg.WscControl.WscDriverAutoConnect);
 	/* display pin code */

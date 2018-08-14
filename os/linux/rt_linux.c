@@ -54,7 +54,7 @@
 #define RT_CONFIG_IF_OPMODE_ON_STA(__OpMode)
 #endif
 
-ULONG RTDebugLevel = RT_DEBUG_ERROR;
+ULONG RTDebugLevel = 0;
 ULONG RTDebugFunc = 0;
 
 #ifdef OS_ABL_FUNC_SUPPORT
@@ -1176,6 +1176,9 @@ void RtmpOSFileSeek(RTMP_OS_FD osfd, int offset)
 
 int RtmpOSFileRead(RTMP_OS_FD osfd, char *pDataPtr, int readLen)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+	return kernel_read(osfd, 0, pDataPtr, readLen);
+#else
 	/* The object must have a read method */
 	if (osfd->f_op && osfd->f_op->read) {
 		return osfd->f_op->read(osfd, pDataPtr, readLen, &osfd->f_pos);
@@ -1183,6 +1186,7 @@ int RtmpOSFileRead(RTMP_OS_FD osfd, char *pDataPtr, int readLen)
 		DBGPRINT(RT_DEBUG_ERROR, ("no file read method\n"));
 		return -1;
 	}
+#endif
 }
 
 int RtmpOSFileWrite(RTMP_OS_FD osfd, char *pDataPtr, int writeLen)
@@ -1760,9 +1764,6 @@ INT RtmpOSNetDevDestory(VOID *pReserved, PNET_DEV pNetDev)
 
 void RtmpOSNetDevDetach(PNET_DEV pNetDev)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
-	struct net_device_ops *pNetDevOps = (struct net_device_ops *)pNetDev->netdev_ops;
-#endif
 #if 1
 	//int ret;
 
@@ -1784,7 +1785,11 @@ void RtmpOSNetDevDetach(PNET_DEV pNetDev)
 		unregister_netdevice(pNetDev);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
-	vfree(pNetDevOps);
+	if (pNetDev->netdev_ops) {
+		DBGPRINT(RT_DEBUG_OFF, ("vfree net device ops <- %p\n", pNetDev->netdev_ops));
+		vfree(pNetDev->netdev_ops);
+		pNetDev->netdev_ops = NULL;
+	}
 #endif
 }
 
@@ -1874,6 +1879,7 @@ int RtmpOSNetDevAttach(
 		pNetDev->get_wireless_stats = pDevOpHook->get_wstats;
 #endif
 
+#ifdef CONFIG_WIRELESS_EXT
 #ifdef CONFIG_STA_SUPPORT
 #if WIRELESS_EXT >= 12
 		if (OpMode == OPMODE_STA) {
@@ -1891,7 +1897,7 @@ int RtmpOSNetDevAttach(
 		}
 #endif /*WIRELESS_EXT >= 12 */
 #endif /* CONFIG_APSTA_MIXED_SUPPORT */
-
+#endif /* CONFIG_WIRELESS_EXT */
 		/* copy the net device mac address to the net_device structure. */
 		NdisMoveMemory(pNetDev->dev_addr, &pDevOpHook->devAddr[0],
 			       MAC_ADDR_LEN);
@@ -3584,23 +3590,32 @@ BOOLEAN CFG80211OS_RxMgmt(IN PNET_DEV pNetDev, IN INT32 freq, IN PUCHAR frame, I
 		CFG80211DBG(RT_DEBUG_ERROR, ("%s: pNetDev == NULL\n", __FUNCTION__));
 		return FALSE;
 	}
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0))
-    return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
-                                freq,
-                                0,       //CFG_TODO return 0 in dbm
-                                frame,
-                                len,
-                                0,
-                                GFP_ATOMIC);
-#else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
-	return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr, freq, 0,frame,len,GFP_ATOMIC);//return 0 in dbm
-#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+		return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
+									freq,
+									0,
+									frame,
+									len,
+									0);	
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
+		return cfg80211_rx_mgmt(pNetDev->ieee80211_ptr,
+									freq,
+									0,
+									frame,
+									len,
+									GFP_ATOMIC);
+#else	
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
-        return cfg80211_rx_mgmt(pNetDev, freq, 0, frame, len, GFP_ATOMIC);
+		return cfg80211_rx_mgmt(pNetDev,
+					freq,
+					0,
+					frame,
+					len,
+					GFP_ATOMIC); 
 #else
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+			return cfg80211_rx_mgmt(pNetDev, freq, frame, len, GFP_ATOMIC);
+#else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
 		return cfg80211_rx_action(pNetDev, freq, frame, len, GFP_ATOMIC);
 #else

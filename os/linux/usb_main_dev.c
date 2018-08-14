@@ -827,6 +827,7 @@ static void rt2870_disconnect(struct usb_device *dev, VOID *pAd)
 //	RtmpOSNetDevFree(net_dev);
 
 	RtmpRaDevCtrlExit(pAd);
+	RTMPFreeAdapter(pAd);
 
 	/* free the root net_device */
 	RtmpOSNetDevFree(net_dev);
@@ -931,7 +932,7 @@ static int rt2870_probe(
 
 /*USBDevInit============================================== */
 	if (USBDevConfigInit(usb_dev, intf, pAd) == FALSE)
-		goto err_out_free_radev;
+		goto err_out_free_ad;
 
 	RtmpRaDevCtrlInit(pAd, RTMP_DEV_INF_USB);
 	
@@ -1021,6 +1022,9 @@ err_out_free_netdev:
 	RtmpOSNetDevFree(net_dev);
 	
 err_out_free_radev:
+	RtmpRaDevCtrlExit(pAd);
+
+err_out_free_ad:
 	RTMPFreeAdapter(pAd);
 	
 err_out:

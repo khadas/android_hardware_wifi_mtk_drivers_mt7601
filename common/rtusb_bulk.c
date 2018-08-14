@@ -1335,6 +1335,10 @@ USBHST_STATUS RTUSBBulkCmdRspEventComplete(URBCompleteStatus Status, purbb_t pUR
 	pAd = pCmdRspEventContext->pAd;
 	pObj = (POS_COOKIE)pAd->OS_Cookie;
 
+	/* should not continue if urb is unlinked */
+	if (pURB->unlinked != USB_ST_NOERROR)
+		return;
+
 	RTMP_NET_TASK_DATA_ASSIGN(&pObj->cmd_rsp_event_task, (unsigned long)pURB);
 	RTMP_OS_TASKLET_SCHE(&pObj->cmd_rsp_event_task);
 }

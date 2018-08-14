@@ -826,12 +826,15 @@ VOID NICReadEEPROMParameters(RTMP_ADAPTER *pAd, PSTRING mac_addr)
 		value2 = pAd->EEPROMDefaultValue[EEPROM_COUNTRY_REG_OFFSET] & 0x00FF;	/* 5G band*/
 	}
 	
-	if ((value <= REGION_MAXIMUM_BG_BAND) || (value == REGION_32_BG_BAND) || (value == REGION_33_BG_BAND))
+	if ((value <= REGION_MAXIMUM_BG_BAND)
+		|| (value == REGION_32_BG_BAND) || (value == REGION_33_BG_BAND)
+		|| ((value >= REGION_BAND_START) && (value <= REGION_BAND_END)))
 	{
 		pAd->CommonCfg.CountryRegion = ((UCHAR) value) | 0x80;
 	}
 
-	if (value2 <= REGION_MAXIMUM_A_BAND)
+	if ((value2 <= REGION_MAXIMUM_A_BAND)
+		|| ((value2 >= REGION_BAND_START) && (value2 <= REGION_BAND_END)))
 	{
 		pAd->CommonCfg.CountryRegionForABand = ((UCHAR) value2) | 0x80;
 	}
@@ -4065,7 +4068,6 @@ INT RtmpRaDevCtrlInit(VOID *pAdSrc, RTMP_INF_TYPE infType)
 BOOLEAN RtmpRaDevCtrlExit(IN VOID *pAdSrc)
 {
 	PRTMP_ADAPTER	pAd = (PRTMP_ADAPTER)pAdSrc;
-	INT index;
 	
 #ifdef MULTIPLE_CARD_SUPPORT
 extern UINT8  MC_CardUsed[MAX_NUM_OF_MULTIPLE_CARD];
@@ -4092,19 +4094,6 @@ extern UINT8  MC_CardUsed[MAX_NUM_OF_MULTIPLE_CARD];
 		os_free_mem(pAd, pAd->UsbVendorReqBuf);
 #endif /* RTMP_MAC_USB */
 
-	/*
-		Free ProbeRespIE Table
-	*/
-	for (index = 0; index < MAX_LEN_OF_BSS_TABLE; index++) 
-	{
-		if (pAd->ProbeRespIE[index].pIe)
-			os_free_mem(pAd, pAd->ProbeRespIE[index].pIe);
-	}
-
-#ifdef RESOURCE_PRE_ALLOC
-	RTMPFreeTxRxRingMemory(pAd);
-#endif /* RESOURCE_PRE_ALLOC */
-
 #ifdef RT65xx
 	if (IS_RT6590(pAd) && (pAd->WlanFunCtrl.field.WLAN_EN == 1))
 	{	
@@ -4118,8 +4107,6 @@ extern UINT8  MC_CardUsed[MAX_NUM_OF_MULTIPLE_CARD];
 		MT7601_WLAN_ChipOnOff(pAd, FALSE, FALSE);
 	}
 #endif /* MT7601 */
-
-	RTMPFreeAdapter(pAd);
 
 	return TRUE;
 }

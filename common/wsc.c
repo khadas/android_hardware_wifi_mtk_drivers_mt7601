@@ -4435,10 +4435,11 @@ VOID	WscSendEapReqId(
 	Id = RandomByte(pAd);
     if (Id == pWpsCtrl->lastId)
         Id += 1;
-	EapFrame.Code   = EAP_CODE_REQ;
-	EapFrame.Id     = Id;
-	EapFrame.Length = cpu2be16(Length);
-	EapFrame.Type   = EAP_TYPE_ID;
+
+    EapFrame.Code   = EAP_CODE_REQ;
+    EapFrame.Id     = Id;
+    EapFrame.Length = cpu2be16(Length);
+    EapFrame.Type   = EAP_TYPE_ID;
     pWpsCtrl->lastId = Id;
 	
     /* Out buffer for transmitting EAP-Req(Identity) */
@@ -4447,23 +4448,23 @@ VOID	WscSendEapReqId(
     if(pOutBuffer == NULL)
         return;
 
-	FrameLen = 0;
+    FrameLen = 0;
 	
 	/* Make	 Transmitting frame */
-	MakeOutgoingFrame(pOutBuffer, &FrameLen,
-					   sizeof(IEEE8021X_FRAME), &Ieee_8021x,
-					   sizeof(EapFrame), &EapFrame, 
-					   (sizeof(Data) - 1), Data,
-		END_OF_ARGS);
+    MakeOutgoingFrame(pOutBuffer, &FrameLen,
+			sizeof(IEEE8021X_FRAME), &Ieee_8021x,
+			sizeof(EapFrame), &EapFrame, 
+			(sizeof(Data) - 1), Data,
+		        END_OF_ARGS);
 
 	/* Copy frame to Tx ring */
-	RTMPToWirelessSta(pAd, pEntry, Header802_3, sizeof(Header802_3), (PUCHAR)pOutBuffer, FrameLen, TRUE);
+    RTMPToWirelessSta(pAd, pEntry, Header802_3, sizeof(Header802_3), (PUCHAR)pOutBuffer, FrameLen, TRUE);
 
-	pWpsCtrl->WscRetryCount = 0;
-	if (pOutBuffer)
-/*		kfree(pOutBuffer); */
-		os_free_mem(NULL, pOutBuffer);
-	DBGPRINT(RT_DEBUG_TRACE, ("<----- WscSendEapReqId\n"));	
+    pWpsCtrl->WscRetryCount = 0;
+    if (pOutBuffer)
+	os_free_mem(NULL, pOutBuffer);
+
+    DBGPRINT(RT_DEBUG_TRACE, ("<----- WscSendEapReqId\n"));	
 }
 
 /*
@@ -4659,7 +4660,7 @@ VOID	WscSendEapRspId(
     if(pOutBuffer == NULL)
         return;
 
-	FrameLen = 0;
+    FrameLen = 0;
 
     if (pWscControl->WscConfMode == WSC_REGISTRAR)
     {
@@ -5888,7 +5889,7 @@ VOID	WscSendEapFail(
     if(pOutBuffer == NULL)
         return;
 
-	FrameLen = 0;
+    FrameLen = 0;
 	
 	/* Make	 Transmitting frame */
 	MakeOutgoingFrame(pOutBuffer, &FrameLen,
@@ -9465,28 +9466,28 @@ INT	WscGetConfWithoutTrigger(
     if (bFromUPnP)
         WscStop(pAd, FALSE, pWscControl);
     
-	if (pWscControl->WscMode == 1)
-		WscMode = DEV_PASS_ID_PIN;
-	else
-		WscMode = DEV_PASS_ID_PBC;
+    if (pWscControl->WscMode == 1)
+	WscMode = DEV_PASS_ID_PIN;
+    else
+	WscMode = DEV_PASS_ID_PBC;
     
-	WscBuildBeaconIE(pAd, IsAPConfigured, TRUE, WscMode, pWscControl->WscConfigMethods, (pWscControl->EntryIfIdx & 0x0F), NULL, 0, AP_MODE);
-	WscBuildProbeRespIE(pAd, WSC_MSGTYPE_AP_WLAN_MGR, IsAPConfigured, TRUE, WscMode, pWscControl->WscConfigMethods, pWscControl->EntryIfIdx, NULL, 0, AP_MODE);
-	APUpdateBeaconFrame(pAd, pWscControl->EntryIfIdx & 0x0F);
+    WscBuildBeaconIE(pAd, IsAPConfigured, TRUE, WscMode, pWscControl->WscConfigMethods, (pWscControl->EntryIfIdx & 0x0F), NULL, 0, AP_MODE);
+    WscBuildProbeRespIE(pAd, WSC_MSGTYPE_AP_WLAN_MGR, IsAPConfigured, TRUE, WscMode, pWscControl->WscConfigMethods, pWscControl->EntryIfIdx, NULL, 0, AP_MODE);
+    APUpdateBeaconFrame(pAd, pWscControl->EntryIfIdx & 0x0F);
 
     /* 2mins time-out timer */
     RTMPSetTimer(&pWscControl->Wsc2MinsTimer, WSC_TWO_MINS_TIME_OUT);
     pWscControl->Wsc2MinsTimerRunning = TRUE;
     pWscControl->WscStatus = STATUS_WSC_LINK_UP;
     if (bFromUPnP)
-		WscSendUPnPConfReqMsg(pAd, apIdx, (PUCHAR)pAd->ApCfg.MBSSID[apIdx].Ssid, 
+	WscSendUPnPConfReqMsg(pAd, apIdx, (PUCHAR)pAd->ApCfg.MBSSID[apIdx].Ssid, 
 									pAd->ApCfg.MBSSID[apIdx].Bssid, 3, 0, AP_MODE);
 
     pWscControl->bWscTrigger = TRUE;
-	pWscControl->bWscAutoTigeer = TRUE;
-	DBGPRINT(RT_DEBUG_TRACE, ("%s:: trigger WSC state machine\n", __FUNCTION__));
+    pWscControl->bWscAutoTigeer = TRUE;
+    DBGPRINT(RT_DEBUG_TRACE, ("%s:: trigger WSC state machine\n", __FUNCTION__));
 
-	return TRUE;
+    return TRUE;
 }
 #endif /* CONFIG_AP_SUPPORT */
 

@@ -435,7 +435,7 @@ typedef struct __CMD_RTPRIV_IOCTL_80211_CHAN {
 typedef struct __CMD_RTPRIV_IOCTL_80211_IBSS {
 
 	UINT32 BeaconInterval;
-	UCHAR *pSsid;
+	const UCHAR *pSsid;
 } CMD_RTPRIV_IOCTL_80211_IBSS;
 
 typedef struct __CMD_RTPRIV_IOCTL_80211_STA {
@@ -491,11 +491,11 @@ typedef struct __CMD_RTPRIV_IOCTL_80211_CONNECT {
 	UINT32 KeyLen;
 	UINT8 KeyIdx;
 
-	UINT8 *pSsid;
+	const UINT8 *pSsid;
 	UINT32 SsidLen;
-	
-	UINT8 *pBssid;  
-	
+
+	const UINT8 *pBssid;
+
 	BOOLEAN bWpsConnection;
 } CMD_RTPRIV_IOCTL_80211_CONNECT;
 

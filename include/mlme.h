@@ -94,9 +94,7 @@
 #endif /* CONFIG_AP_SUPPORT */
 #endif /* CONFIG_STA_SUPPORT */
 
-#ifdef CONFIG_APSTA_MIXED_SUPPORT
 extern UINT32 CW_MAX_IN_BITS;
-#endif /* CONFIG_APSTA_MIXED_SUPPORT */
 
 /* Note: RSSI_TO_DBM_OFFSET has been changed to variable for new RF (2004-0720). */
 /* SHould not refer to this constant anymore */

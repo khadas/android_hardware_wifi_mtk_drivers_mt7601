@@ -2555,6 +2555,70 @@ VOID Update_Rssi_Sample(
 
 
 
+/* Compare CCMP PN value and return whether the pkt in rxblk is allowed.
+ *
+ * @pRxBlk: the rxblk to be checked
+ */
+BOOLEAN check_rx_pkt_pn_allowed(RTMP_ADAPTER *pAd, RX_BLK *pRxBlk)
+{
+        MAC_TABLE_ENTRY *pEntry;
+
+        if (likely(!pRxBlk->ccmp_pn_valid)) {
+                DBGPRINT(RT_DEBUG_TRACE, ("no CCMP PN, bypass\n"));
+                return TRUE; /* ccmp_pn not calculated (UC or non-ccmp BMC) */
+        }
+
+        if (unlikely(pRxBlk->wcid >= MAX_LEN_OF_MAC_TABLE)) {
+                DBGPRINT(RT_DEBUG_ERROR, ("invalid pRxBlk->wcid %u, bypass\n",
+                        pRxBlk->wcid));
+                return TRUE;
+        }
+
+        pEntry = &pAd->MacTab.Content[pRxBlk->wcid];
+
+#if 0
+        if (!pEntry->wdev) {
+                DBGPRINT(RT_DEBUG_ERROR, ("null w %u pEntry->wdev, bypass\n",
+                        pRxBlk->wcid));
+                return TRUE;
+        }
+#endif
+
+        if (pRxBlk->pRxInfo->Mcast || pRxBlk->pRxInfo->Bcast) {
+                UCHAR kid = pRxBlk->key_idx;
+
+                if (unlikely(kid >= ARRAY_SIZE(pEntry->rx_ccmp_pn_bmc))) {
+                        DBGPRINT(RT_DEBUG_ERROR, ("invalid key id %u\n", kid));
+                        return TRUE;
+                }
+
+                if (likely(pRxBlk->ccmp_pn > pEntry->rx_ccmp_pn_bmc[kid])) {
+                        /* PN-0 is NOT allowed from now on */
+                        pEntry->rx_ccmp_pn_bmc_zero[kid] = FALSE;
+                        pEntry->rx_ccmp_pn_bmc[kid] = pRxBlk->ccmp_pn;
+                        DBGPRINT(RT_DEBUG_ERROR, ("update rx bmc[%u] PN %llu\n",
+                                 kid, pRxBlk->ccmp_pn));
+                        return TRUE;
+                }
+
+                /* Some APs initialize PN to 0, allow it only if first rx pkt */
+                if (unlikely(pRxBlk->ccmp_pn == 0)) {
+                        if (pEntry->rx_ccmp_pn_bmc_zero[kid]) {
+                                pEntry->rx_ccmp_pn_bmc_zero[kid] = FALSE;
+                                return TRUE;
+                        }
+                }
+
+                DBGPRINT(RT_DEBUG_ERROR, ("drop rx bmc[%u] %llu, exp > %llu\n",
+                         kid, pRxBlk->ccmp_pn,
+                         pEntry->rx_ccmp_pn_bmc[kid]));
+                return FALSE;
+        }
+
+        /* skip unicast check now */
+        return TRUE;
+}
+
 /* Normal legacy Rx packet indication*/
 VOID Indicate_Legacy_Packet(
 	IN RTMP_ADAPTER *pAd,
@@ -2572,6 +2636,12 @@ if (0) {
 	hex_dump("802_11_hdr", (UCHAR *)pRxBlk->pHeader, LENGTH_802_11);
 }
 //---Add by shiang for debug
+
+	if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
+		DBGPRINT(RT_DEBUG_OFF, ("%s:drop packet by PN mismatch!\n", __func__));
+		RELEASE_NDIS_PACKET(pAd, pRxPacket, NDIS_STATUS_FAILURE);
+		return;
+	}
 
 	/*
 		1. get 802.3 Header
@@ -4249,6 +4319,4 @@ NTSTATUS StopDmaTx(
 	//DBGPRINT(RT_DEBUG_TRACE, ("<==== %s\n", __FUNCTION__));
 	return STATUS_SUCCESS;
 }
-
-
 

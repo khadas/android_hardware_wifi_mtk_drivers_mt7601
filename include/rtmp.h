@@ -2556,6 +2556,10 @@ typedef struct _MAC_TABLE_ENTRY {
 	UCHAR PMKID[LEN_PMKID];
 	UCHAR NegotiatedAKM[LEN_OUI_SUITE];	/* It indicate the negotiated AKM suite */
 
+	UINT64 rx_ccmp_pn_bmc[SHARE_KEY_NUM]; /* rx pn replay check */
+	BOOLEAN rx_ccmp_pn_bmc_zero[SHARE_KEY_NUM]; /* allow PN=0 only once for AP IOT */
+	UINT64 rx_ccmp_pn_uc; /* rx pn replay check */
+
 #ifdef WAPI_SUPPORT
 	UCHAR usk_id;		/* unicast key index for WPI */
 #endif				/* WAPI_SUPPORT */
@@ -4776,12 +4780,17 @@ typedef struct _RX_BLK_
 	UCHAR wcid;		/* copy of pRxWI->RxWIWirelessCliID */
 	UCHAR mcs;
 	UCHAR U2M;
+	UCHAR key_idx;
+	UCHAR bss_idx;
 #ifdef HDR_TRANS_SUPPORT
 	BOOLEAN	bHdrRxTrans;	/* this packet's header is translated to 802.3 by HW  */
 	BOOLEAN bHdrVlanTaged;	/* VLAN tag is added to this header */
 	UCHAR *pTransData;
 	USHORT TransDataSize;
 #endif /* HDR_TRANS_SUPPORT */
+	UCHAR eiv_pn[16]; /* IV/EIV in rx mpdu padded by hw */
+	UINT64 ccmp_pn; /* pn value in CCMP header */
+	BOOLEAN ccmp_pn_valid; /* is ccmp_pn value composed from rx frame? */
 } RX_BLK;
 
 
@@ -10556,6 +10565,7 @@ VOID RTMPAcsRssi(
 	IN PRTMP_ADAPTER	pAd,
 	IN RSSI_SAMPLE 		*pRssi);
 
+BOOLEAN check_rx_pkt_pn_allowed(RTMP_ADAPTER *pAd, RX_BLK *rx_blk);
 #endif /* DYNAMIC_PD_SUPPORT */
 #endif  /* __RTMP_H__ */
 

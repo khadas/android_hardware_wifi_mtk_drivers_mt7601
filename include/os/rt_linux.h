@@ -159,9 +159,13 @@ typedef struct usb_ctrlrequest devctrlrequest;
 #ifdef ALLWINNER
 #define STA_PROFILE_PATH                        "/system/vendor/modules/RT2870STA_7601.dat"
 #else
-#define STA_PROFILE_PATH			"/system/etc/wifi/RT2870STA_7601.dat"
+#ifdef ANDROID_O_SUPPORT
+#define STA_PROFILE_PATH			"/vendor/etc/Wireless/RT2870STA/MT7601USTA.dat"
+#else
+#define STA_PROFILE_PATH			"/vendor/etc/wifi/MT7601USTA.dat"
+#endif /* ANDROID_O_SUPPORT */
 #endif
-#define STA_DRIVER_VERSION			"JEDI.MP1.mt7601u.v1.8"
+#define STA_DRIVER_VERSION			"JEDI.MP1.mt7601u.v1.11"
 #define DRIVER_ROLE			"STA"
 #ifdef MULTIPLE_CARD_SUPPORT
 #define CARD_INFO_PATH			"/etc/Wireless/RT2870STA/RT2870STACard.dat"

@@ -222,6 +222,8 @@ HAS_MICROWAVE_OVEN_SUPPORT=n
 HAS_CONFIG_ELIAN_SUPPORT=n
 #endif
 
+HAS_ANDROID_O_SUPPORT=n
+
 ifeq ($(PLATFORM),MSTAR)
 HAS_WSC=n
 HAS_OLD_PRE_ALLOC=n
@@ -534,7 +536,7 @@ WFLAGS += -DDOT11Z_TDLS_SUPPORT -DUAPSD_SUPPORT
 endif
 
 ifeq ($(HAS_P2P_SUPPORT),y)
-WFLAGS += -DP2P_SUPPORT -DAPCLI_SUPPORT -DMAT_SUPPORT -DAP_SCAN_SUPPORT -DSCAN_SUPPORT -DP2P_APCLI_SUPPORT -DCONFIG_AP_SUPPORT -DCONFIG_APSTA_MIXED_SUPPORT -DUAPSD_SUPPORT -DMBSS_SUPPORT -DIAPP_SUPPORT -DDOT1X_SUPPORT -DWSC_AP_SUPPORT -DWSC_STA_SUPPORT
+WFLAGS += -DP2P_SUPPORT -DAPCLI_SUPPORT -DMAT_SUPPORT -DAP_SCAN_SUPPORT -DSCAN_SUPPORT -DP2P_APCLI_SUPPORT -DCONFIG_AP_SUPPORT -DUAPSD_SUPPORT -DMBSS_SUPPORT -DIAPP_SUPPORT -DDOT1X_SUPPORT -DWSC_AP_SUPPORT -DWSC_STA_SUPPORT
 endif
 
 ifeq ($(HAS_P2P_ODD_MAC_ADJUST),y)
@@ -646,6 +648,10 @@ endif
 
 ifeq ($(HAS_SUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES),y)
 WFLAGS += -DSUPPORT_ANDROID_HOSTAPD_ASSOC_REQ_IES
+endif
+
+ifeq ($(HAS_ANDROID_O_SUPPORT),y)
+WFLAGS += -DANDROID_O_SUPPORT
 endif
 
 endif
@@ -1011,7 +1017,7 @@ CHIPSET_DAT = 2860
 endif
 
 
-ifneq ($(findstring 7601u,$(CHIPSET)),)
+ifneq ($(findstring 7601U,$(CHIPSET)),)
 WFLAGS += -DMT7601U -DMT7601 -DRLT_MAC -DRLT_RF -DRTMP_MAC_USB -DRTMP_USB_SUPPORT -DRTMP_TIMER_TASK_SUPPORT -DRX_DMA_SCATTER -DVCORECAL_SUPPORT -DRTMP_EFUSE_SUPPORT -DNEW_MBSSID_MODE -DRTMP_INTERNAL_TX_ALC -DCONFIG_ANDES_SUPPORT 
 #WFLAGS += -DMT7601U -DMT7601 -DRLT_MAC -DRLT_RF -DRTMP_MAC_USB -DRTMP_USB_SUPPORT -DRTMP_TIMER_TASK_SUPPORT -DRX_DMA_SCATTER -DVCORECAL_SUPPORT -DNEW_MBSSID_MODE -DRTMP_INTERNAL_TX_ALC -DCONFIG_ANDES_SUPPORT
 ifneq ($(findstring $(RT28xx_MODE),AP),)
@@ -1504,6 +1510,7 @@ ifeq ($(PLATFORM),NXP_TV550)
         EXTRA_CFLAGS := $(WFLAGS)
     endif
 endif
+
 
 ifeq ($(PLATFORM),PANDA)
 EXTRA_CFLAGS += -I$(LINUX_SRC)/include -I$(RT28xx_DIR)/include -I$(LINUX_SRC)/arch/arm/include -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=7 -march=armv7-a -fno-pic -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack $(WFLAGS)

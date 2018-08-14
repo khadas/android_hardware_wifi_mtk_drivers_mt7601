@@ -5088,6 +5088,13 @@ if (0 /*!(pRxInfo->Mcast || pRxInfo->Bcast)*/){
 	   and it's passed to driver with "Decrypted" marked as 0 in RxD. */
 	if ((pHeader->FC.Wep == 1) && (pRxInfo->Decrypted == 0))
 	{	
+		CIPHER_KEY *pSwKey = &pEntry->PairwiseKey;
+
+		if (pSwKey->CipherAlg == CIPHER_AES) {
+			/* store PN and pn_len before sw-dec */
+			memcpy(pRxBlk->eiv_pn, pRxBlk->pData, LEN_CCMP_HDR);
+			pRxInfo->pn_len = LEN_CCMP_HDR / 4; /* dword count */
+		}
 		if (RTMPSoftDecryptionAction(pAd, 
 								 	(PUCHAR)pHeader, 
 									 UserPriority, 
@@ -5101,9 +5108,44 @@ if (0 /*!(pRxInfo->Mcast || pRxInfo->Bcast)*/){
 		}
 		/* Record the Decrypted bit as 1 */
 		pRxInfo->Decrypted = 1;
-	}
+	} else
 #endif /* SOFT_ENCRYPT */
+	do {
+		/* Store hw padded IV/EIV (if any) and move pRxBlk->pData.
+		 *
+		 * @pRxBlk: rx descriptor block
+		 * @pRxInfo: rxinfo in rxblk hw_rx_info
+		 * @pRxWI: rxwi in pRxPacket
+		 */
+		UINT32 pn_len_byte;
 
+		if (!pRxInfo->pn_len) {
+			DBGPRINT(RT_DEBUG_OFF, ("no IV/EIV padded\n"));
+			break; /* no IV/EIV padding */
+		}
+
+		pn_len_byte = pRxInfo->pn_len * 4;
+		if (unlikely(pRxBlk->DataSize <= pn_len_byte)) {
+			/* not enough data */
+			DBGPRINT(RT_DEBUG_ERROR, ("DataSize %u <= pn_len %u\n",
+				pRxBlk->DataSize, pn_len_byte));
+			goto err; /* give up this frame */
+		}
+
+		if (unlikely(sizeof(pRxBlk->eiv_pn) <= pn_len_byte)) {
+			/* not enough eiv_pn buffer */
+			DBGPRINT(RT_DEBUG_ERROR,
+				("pRxBlk->eiv_pn size %zu <= pn_len %u\n",
+				sizeof(pRxBlk->eiv_pn), pn_len_byte));
+			goto err; /* give up this frame */
+		}
+
+		/* store padded IV/EIV in rxblk */
+		memcpy(pRxBlk->eiv_pn, pRxBlk->pData, pn_len_byte);
+		/* move pRxBlk->pData pointer */
+		pRxBlk->pData += pn_len_byte;
+		pRxBlk->DataSize -= pn_len_byte;
+	} while (0);
 	if (!((pHeader->Frag == 0) && (pFmeCtrl->MoreFrag == 0)))
 	{
 		/* re-assemble the fragmented packets */

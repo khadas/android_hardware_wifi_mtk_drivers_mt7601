@@ -644,6 +644,16 @@ VOID	RTMPFreeAdapter(
 
 	os_cookie=(POS_COOKIE)pAd->OS_Cookie;
 
+	/* Free ProbeRespIE Table */
+	for (index = 0; index < MAX_LEN_OF_BSS_TABLE; index++) {
+		if (pAd->ProbeRespIE[index].pIe)
+			os_free_mem(pAd, pAd->ProbeRespIE[index].pIe);
+	}
+
+#ifdef RESOURCE_PRE_ALLOC
+	RTMPFreeTxRxRingMemory(pAd);
+#endif /* RESOURCE_PRE_ALLOC */
+
 	if (pAd->BeaconBuf)
 		os_free_mem(NULL, pAd->BeaconBuf);
 

@@ -822,7 +822,7 @@ NDIS_STATUS	RTUSBEnqueueCmdFromNdis(
 	if ((status != NDIS_STATUS_SUCCESS) || (cmdqelmt == NULL))
 		return (NDIS_STATUS_RESOURCES);
 
-		cmdqelmt->buffer = NULL;
+	cmdqelmt->buffer = NULL;
 		if (pInformationBuffer != NULL)
 		{
 			status = os_alloc_mem(pAd, (PUCHAR *)&cmdqelmt->buffer, InformationBufferLength);

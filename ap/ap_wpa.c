@@ -567,14 +567,14 @@ VOID HandleCounterMeasure(
         return;
 
 	/* Todo by AlbertY - Not support currently in ApClient-link */
-	if (IS_ENTRY_APCLI(pEntry))
-		return;
+    if (IS_ENTRY_APCLI(pEntry))
+	return;
 
 	/* if entry not set key done, ignore this RX MIC ERROR */
-	if ((pEntry->WpaState < AS_PTKINITDONE) || (pEntry->GTKState != REKEY_ESTABLISHED))
-		return;
+    if ((pEntry->WpaState < AS_PTKINITDONE) || (pEntry->GTKState != REKEY_ESTABLISHED))
+	return;
 
-	DBGPRINT(RT_DEBUG_TRACE, ("HandleCounterMeasure ===> \n"));
+    DBGPRINT(RT_DEBUG_TRACE, ("HandleCounterMeasure ===> \n"));
 
     /* record which entry causes this MIC error, if this entry sends disauth/disassoc, AP doesn't need to log the CM */
     pEntry->CMTimerRunning = TRUE;

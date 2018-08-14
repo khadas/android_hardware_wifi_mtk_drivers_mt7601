@@ -64,9 +64,7 @@ UCHAR RxwiMCSToOfdmRate[12] = {
 };
 
 
-#ifdef CONFIG_APSTA_MIXED_SUPPORT
 UINT32 CW_MAX_IN_BITS;
-#endif /* CONFIG_APSTA_MIXED_SUPPORT */
 
 
 
@@ -5382,11 +5380,10 @@ BOOLEAN MlmeEnqueueForWsc(
         return FALSE;
 
 	/* First check the size, it MUST not exceed the mlme queue size*/
-	if (MsgLen > MGMT_DMA_BUFFER_SIZE)
-	{
+    if (MsgLen > MGMT_DMA_BUFFER_SIZE) {
         DBGPRINT_ERR(("MlmeEnqueueForWsc: msg too large, size = %ld \n", MsgLen));
-		return FALSE;
-	}
+	return FALSE;
+    }
 	
     if (MlmeQueueFull(Queue, 1)) 
     {

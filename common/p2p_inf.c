@@ -72,9 +72,11 @@ VOID RTMP_P2P_Init(
 		netDevHook.xmit = P2P_VirtualIF_PacketSend;	/* hard transmit hook point */
 		netDevHook.ioctl = P2P_VirtualIF_Ioctl;	/* ioctl hook point */
 
+#ifdef CONFIG_APSTA_MIXED_SUPPORT
 #if WIRELESS_EXT >= 12
 		netDevHook.iw_handler = (void *)&rt28xx_ap_iw_handler_def;
 #endif /* WIRELESS_EXT >= 12 */
+#endif /* CONFIG_APSTA_MIXED_SUPPORT */
 		RTMP_COM_IoctlHandle(pAd, NULL, CMD_RTPRIV_IOCTL_P2P_INIT,
 							0, &netDevHook, 0);
 

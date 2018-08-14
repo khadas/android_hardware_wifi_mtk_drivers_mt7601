@@ -646,15 +646,15 @@ VOID Adhoc_PeerPairMsg1Action(
     if (Elem->MsgLen < (LENGTH_802_11 + LENGTH_802_1_H + LENGTH_EAPOL_H + MIN_LEN_OF_EAPOL_KEY_MSG))
         return;
 	
-	pCurrentAddr = pAd->CurrentAddress;
-	pmk_ptr = pAd->StaCfg.PMK;
-	group_cipher = pAd->StaCfg.GroupCipher;
-	rsnie_ptr = pAd->StaCfg.RSN_IE;
-	rsnie_len = pAd->StaCfg.RSNIE_Len;
+    pCurrentAddr = pAd->CurrentAddress;
+    pmk_ptr = pAd->StaCfg.PMK;
+    group_cipher = pAd->StaCfg.GroupCipher;
+    rsnie_ptr = pAd->StaCfg.RSN_IE;
+    rsnie_len = pAd->StaCfg.RSNIE_Len;
 
 	/* Store the received frame */
-	pMsg1 = (PEAPOL_PACKET) &Elem->Msg[LENGTH_802_11 + LENGTH_802_1_H];
-	MsgLen = Elem->MsgLen - LENGTH_802_11 - LENGTH_802_1_H;
+    pMsg1 = (PEAPOL_PACKET) &Elem->Msg[LENGTH_802_11 + LENGTH_802_1_H];
+    MsgLen = Elem->MsgLen - LENGTH_802_11 - LENGTH_802_1_H;
 	
 	/* Sanity Check peer Pairwise message 1 - Replay Counter */
 	if (Adhoc_PeerWpaMessageSanity(pAd, pMsg1, MsgLen, EAPOL_PAIR_MSG_1, pSupplicant, pEntry) == FALSE)
@@ -769,7 +769,7 @@ VOID Adhoc_PeerPairMsg2Action(
     if (pAuthenticator->WpaState < AS_PTKSTART)
         return;
 
-	pBssid = pAd->CommonCfg.Bssid;
+    pBssid = pAd->CommonCfg.Bssid;
 
 	pmk_ptr = pAd->StaCfg.PMK;
 	gtk_ptr = pAd->StaCfg.GTK;

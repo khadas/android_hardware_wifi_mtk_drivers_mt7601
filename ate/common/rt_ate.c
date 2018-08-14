@@ -213,8 +213,7 @@ VOID DefaultATEAsicAdjustTxPower(
 	CHAR TotalDeltaPower = 0; 
 	UCHAR desiredTSSI = 0, currentTSSI = 0;
 	const TX_POWER_TUNING_ENTRY_STRUCT *TxPowerTuningTable = pAd->chipCap.TxPowerTuningTable_2G;
-	PTX_POWER_TUNING_ENTRY_STRUCT pTxPowerTuningEntry = NULL;
-//	UCHAR RFValue = 0, TmpValue = 0;   
+	const TX_POWER_TUNING_ENTRY_STRUCT *pTxPowerTuningEntry = NULL;
 #endif /* RTMP_INTERNAL_TX_ALC */
 
 	maxTxPwrCnt = pChipStruct->maxTxPwrCnt;
@@ -306,7 +305,7 @@ VOID DefaultATEAsicAdjustTxPower(
 			}
 
 			/* Valid pAd->TxPowerCtrl.idxTxPowerTable: -30 ~ 45 */
-			*pTxPowerTuningEntry = TxPowerTuningTable[pAd->TxPowerCtrl.idxTxPowerTable + TX_POWER_TUNING_ENTRY_OFFSET]; /* zero-based array */
+			pTxPowerTuningEntry = &TxPowerTuningTable[pAd->TxPowerCtrl.idxTxPowerTable + TX_POWER_TUNING_ENTRY_OFFSET]; /* zero-based array */
 			pAd->TxPowerCtrl.RF_TX_ALC = pTxPowerTuningEntry->RF_TX_ALC;
 			pAd->TxPowerCtrl.MAC_PowerDelta = pTxPowerTuningEntry->MAC_PowerDelta;
 
@@ -4210,7 +4209,7 @@ INT Set_ATE_Load_E2P_Proc(
 	PSTRING			src = EEPROM_BIN_FILE_NAME;
 	RTMP_OS_FD		srcf;
 	INT32 			retval;
-	USHORT 			WriteEEPROM[(EEPROM_SIZE >> 1)];
+	USHORT			*WriteEEPROM = NULL;
 	INT				FileLength = 0;
 	UINT32 			value = (UINT32) simple_strtol(arg, 0, 10);
 	RTMP_OS_FS_INFO	osFSInfo;
@@ -4220,6 +4219,11 @@ INT Set_ATE_Load_E2P_Proc(
 	if (value > 0)
 	{
 		/* zero the e2p buffer */
+		os_alloc_mem(NULL, (UCHAR **) &WriteEEPROM, EEPROM_SIZE);
+		if (WriteEEPROM == NULL) {
+			DBGPRINT_ERR(("%s - Error for allocate size %d\n", __func__, EEPROM_SIZE));
+			return ret;
+		}
 		NdisZeroMemory((PUCHAR)WriteEEPROM, EEPROM_SIZE);
 
 		RtmpOSFSInfoChange(&osFSInfo, TRUE);
@@ -4271,6 +4275,8 @@ INT Set_ATE_Load_E2P_Proc(
 
 		/* restore */
 		RtmpOSFSInfoChange(&osFSInfo, FALSE);		
+
+		os_free_mem(NULL, WriteEEPROM);
 	}
 
     DBGPRINT(RT_DEBUG_OFF, ("<=== %s (ret=%d)\n", __FUNCTION__, ret));
@@ -4300,10 +4306,8 @@ INT Set_ATE_Load_E2P_From_Buf_Proc(
 
 	if (value > 0)
 	{
-
-		rt_ee_write_all(pAd, (USHORT *)pAd->EEPROMImage);
+		rt_ee_write_all(pAd, (USHORT *) pAd->EEPROMImage);
 		ret = TRUE;
-	
 	}
 
     DBGPRINT(RT_DEBUG_OFF, ("<=== %s (ret=%d)\n", __FUNCTION__, ret));
@@ -4317,10 +4321,16 @@ INT Set_ATE_Read_E2P_Proc(
 	IN	PRTMP_ADAPTER	pAd, 
 	IN	PSTRING			arg)
 {
-	USHORT buffer[EEPROM_SIZE >> 1];
+	USHORT *buffer = NULL;
 	USHORT *p;
 	int i;
-	
+
+	os_alloc_mem(NULL, (UCHAR **) &buffer, EEPROM_SIZE);
+	if (buffer == NULL) {
+		DBGPRINT_ERR(("%s - Error for allocate size %d\n", __func__, EEPROM_SIZE));
+		return FALSE;
+	}
+
 	rt_ee_read_all(pAd, (USHORT *)buffer);
 	p = buffer;
 	for (i = 0; i < (EEPROM_SIZE >> 1); i++)
@@ -4330,6 +4340,9 @@ INT Set_ATE_Read_E2P_Proc(
 			DBGPRINT(RT_DEBUG_OFF, ("\n"));
 		p++;
 	}
+
+	os_free_mem(NULL, buffer);
+
 	return TRUE;
 }
 

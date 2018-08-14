@@ -1030,7 +1030,11 @@ Note:
 static int CFG80211_OpsStaGet(
 	IN struct wiphy						*pWiphy,
 	IN struct net_device				*pNdev,
-	IN UINT8							*pMac,
+#if KERNEL_VERSION(3, 16, 0) <= LINUX_VERSION_CODE
+	IN const	UINT8 * pMac,
+#else
+	IN UINT8	* pMac,
+#endif
 	IN struct station_info				*pSinfo)
 {
 	VOID *pAd;
@@ -1283,6 +1287,9 @@ static int CFG80211_OpsKeyAdd(
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> %s ==>\n", __FUNCTION__));
 	MAC80211_PAD_GET(pAd, pWiphy);
 
+	if (unlikely(!pParams->key))
+		return -EINVAL;
+
 #ifdef RT_CFG80211_DEBUG
 	hex_dump("KeyBuf=", (UINT8 *)pParams->key, pParams->key_len);
 #endif /* RT_CFG80211_DEBUG */
@@ -1292,6 +1299,20 @@ static int CFG80211_OpsKeyAdd(
 	if (pParams->key_len >= sizeof(KeyInfo.KeyBuf))
 		return -EINVAL;
 	/* End of if */
+
+	/* check_if_all-zero-key() */
+	do {
+		int i;
+
+		for (i = 0; i < pParams->key_len; ++i) {
+			if (pParams->key[i])
+				break;
+		}
+
+		/* return 0 right away if all-zero-key */
+		if (i == pParams->key_len)
+			return 0;
+	} while (0);
 
 	/* init */
 	memset(&KeyInfo, 0, sizeof(KeyInfo));
@@ -1598,9 +1619,6 @@ static int CFG80211_OpsConnect(
 	INT32 Keymgmt = 0;
 	INT32 WpaVersion = 0;
 	INT32 Chan = -1, Idx;
-	unsigned char* pos_start = NULL;
-	int len = 0;
-
 
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> %s ==>\n", __FUNCTION__));
 
@@ -1697,10 +1715,10 @@ static int CFG80211_OpsConnect(
 	{
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))		
 		if(pNdev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT)
-			RTMP_DRIVER_80211_P2PCLI_ASSSOC_IE_SET(pAd, pSme->ie, pSme->ie_len);
+			RTMP_DRIVER_80211_P2PCLI_ASSSOC_IE_SET(pAd, (void *)pSme->ie, pSme->ie_len);
 		else	
 #endif			
-		RTMP_DRIVER_80211_GEN_IE_SET(pAd, pSme->ie, pSme->ie_len);
+		RTMP_DRIVER_80211_GEN_IE_SET(pAd, (void *)pSme->ie, pSme->ie_len);
 	} 
 	else if (pSme->ie_len == 0)
 	{
@@ -1714,28 +1732,13 @@ static int CFG80211_OpsConnect(
 	}
 
 #if 1
-	if(pSme->ie_len > 6)/* EID(1) + LEN(1) + OUI(4) */
-	{
-		pos_start = pSme->ie;
-		while((pos_start - pSme->ie) < pSme->ie_len)
-		{
-			CFG80211DBG(RT_DEBUG_ERROR, ("#####check WPS IE\n"));
-			len = *(pos_start + 1);
-			if(*pos_start == WLAN_EID_VENDOR_SPECIFIC && *(pos_start + 1) >= 4 
-				&& *(pos_start + 2) == 0x00 && *(pos_start + 3) ==0x50 && *(pos_start + 4) == 0xf2 
-				&& *(pos_start + 5) == 0x04)
-			{
-				CFG80211DBG(RT_DEBUG_ERROR, ("ConnInfo.bWpsConnection ===> WPS IE is found\n"));
-				ConnInfo.bWpsConnection = TRUE;
-				break;
-			}
-			else
-			{
-				CFG80211DBG(RT_DEBUG_ERROR, ("ConnInfo.bWpsConnection ===> Not WPS IE\n"));
-				pos_start += len + 1 + 1;
-			}
-			
-		}
+	ConnInfo.bWpsConnection = FALSE;
+	/* Check if WPS is triggerred */
+	if (pSme->ie && pSme->ie_len &&
+	    pSme->auth_type == NL80211_AUTHTYPE_OPEN_SYSTEM &&
+	    ConnInfo.PairwiseEncrypType == RT_CMD_80211_CONN_ENCRYPT_NONE) {
+		if (RTMPFindWPSIE(pSme->ie, (UINT32) pSme->ie_len) != NULL)
+			ConnInfo.bWpsConnection = TRUE;
 	}
 #else
 	if ((pSme->ie_len > 6) /* EID(1) + LEN(1) + OUI(4) */ &&
@@ -1833,6 +1836,83 @@ VOID CFG80211_RFKillStatusUpdate(
 }
 #endif /* RFKILL_HW_SUPPORT */
 
+#if KERNEL_VERSION(2, 6, 33) <= LINUX_VERSION_CODE || 17 < WIRELESS_EXT
+int mt76xx_set_pmk(RTMP_ADAPTER *pAd, const u8 *bssid, const u8 *pmkid)
+{
+	unsigned int idx;
+	unsigned int last;
+	STA_ADMIN_CONFIG *cfg = &pAd->StaCfg;
+
+	BUILD_BUG_ON(ARRAY_SIZE(cfg->SavedPMK[0].BSSID) != MAC_ADDR_LEN);
+	BUILD_BUG_ON(ARRAY_SIZE(cfg->SavedPMK[0].PMKID) != WLAN_PMKID_LEN);
+	BUILD_BUG_ON_NOT_POWER_OF_2(PMKID_NO);
+
+	last = min_t(size_t, cfg->SavedPMKNum, ARRAY_SIZE(cfg->SavedPMK));
+	/* find the bssid */
+	for (idx = 0; idx < last; ++idx)
+		if (!memcmp(bssid, cfg->SavedPMK[idx].BSSID, MAC_ADDR_LEN))
+			break;
+
+	if (idx >= PMKID_NO) {
+		DBGPRINT(RT_DEBUG_WARN, ("%s PMKID full\n", __func__));
+		return -EINVAL;
+	}
+
+	/* found or (!found && space available) */
+	DBGPRINT(RT_DEBUG_OFF, ("Update PMKID idx %d\n", idx));
+	memcpy(cfg->SavedPMK[idx].BSSID, bssid, MAC_ADDR_LEN);
+	memcpy(cfg->SavedPMK[idx].PMKID, pmkid, WLAN_PMKID_LEN);
+	/* Not found, updated the last one */
+	if (idx == cfg->SavedPMKNum)
+		cfg->SavedPMKNum++;
+	/* GeK: [todo][bug] original code might have problems:
+	 * 1. not increasing SavedPMKNum?
+	 * 2. random-add but sequential-search & remove?
+	 */
+
+	DBGPRINT(RT_DEBUG_TRACE, ("%s - IW_PMKSA_ADD\n", __func__));
+	return 0;
+}
+
+int mt76xx_del_pmk(RTMP_ADAPTER *pAd, const u8 *bssid)
+{
+	unsigned int idx;
+	unsigned int last;
+	STA_ADMIN_CONFIG *cfg = &pAd->StaCfg;
+
+	if (!bssid) {
+		memset(&cfg->SavedPMK, 0, sizeof(cfg->SavedPMK));
+		cfg->SavedPMKNum = 0;
+		DBGPRINT(RT_DEBUG_TRACE, ("%s IW_PMKSA_FLUSH\n", __func__));
+		return 0;
+	}
+
+	BUILD_BUG_ON(ARRAY_SIZE(cfg->SavedPMK[0].BSSID) != MAC_ADDR_LEN);
+	BUILD_BUG_ON(ARRAY_SIZE(cfg->SavedPMK[0].PMKID) != WLAN_PMKID_LEN);
+	BUILD_BUG_ON_NOT_POWER_OF_2(PMKID_NO);
+
+	last = min_t(size_t, cfg->SavedPMKNum, ARRAY_SIZE(cfg->SavedPMK));
+	/* find the bssid */
+	for (idx = 0; idx < last; ++idx)
+		if (!memcmp(bssid, cfg->SavedPMK[idx].BSSID, MAC_ADDR_LEN))
+			break;
+
+	if (!cfg->SavedPMKNum || idx >= PMKID_NO) {
+		DBGPRINT(RT_DEBUG_WARN, ("%s PMKID bssid not found\n", __func__));
+		return -EINVAL;
+	}
+
+	/* idx is now the one to be removed */
+	memset(&cfg->SavedPMK[idx], 0, sizeof(cfg->SavedPMK[idx]));
+
+	--last;
+	for (; idx < last; idx++)
+		memcpy(&cfg->SavedPMK[idx], &cfg->SavedPMK[idx + 1], sizeof(cfg->SavedPMK[idx]));
+	--cfg->SavedPMKNum;
+	DBGPRINT(RT_DEBUG_TRACE, ("%s IW_PMKSA_REMOVE\n", __func__));
+	return 0;
+} /* mt76xx_del_pmk */
+#endif /* LINUX_VERSION_CODE >= 2.6.33) || WIRELESS_EXT > 17 */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,33))
 /*
@@ -1927,22 +2007,19 @@ static int CFG80211_OpsPmksaSet(
 	IN struct cfg80211_pmksa			*pPmksa)
 {
 #ifdef CONFIG_STA_SUPPORT
-	VOID *pAd;
-	RT_CMD_STA_IOCTL_PMA_SA IoctlPmaSa, *pIoctlPmaSa = &IoctlPmaSa;
+	RTMP_ADAPTER *pAd;
 
+	if (!pPmksa || !pPmksa->bssid || !pPmksa->pmkid)
+		return -EINVAL;
 
-	CFG80211DBG(RT_DEBUG_ERROR, ("80211> %s ==>\n", __FUNCTION__));
+	CFG80211DBG(RT_DEBUG_OFF, ("80211> %s ==>\n", __func__));
 	MAC80211_PAD_GET(pAd, pWiphy);
 
-	if ((pPmksa->bssid == NULL) || (pPmksa->pmkid == NULL))
-		return -ENOENT;
-	/* End of if */
+	if (!pAd)
+		return -EINVAL;
 
-	pIoctlPmaSa->Cmd = RT_CMD_STA_IOCTL_PMA_SA_ADD;
-	pIoctlPmaSa->pBssid = (UCHAR *)pPmksa->bssid;
-	pIoctlPmaSa->pPmkid = pPmksa->pmkid;
-
-	RTMP_DRIVER_80211_PMKID_CTRL(pAd, pIoctlPmaSa);
+	/* RtmpIoctl_rt_ioctl_siwpmksa */
+	return mt76xx_set_pmk(pAd, pPmksa->bssid, pPmksa->pmkid);
 #endif /* CONFIG_STA_SUPPORT */
 
 	return 0;
@@ -1972,22 +2049,19 @@ static int CFG80211_OpsPmksaDel(
 	IN struct cfg80211_pmksa			*pPmksa)
 {
 #ifdef CONFIG_STA_SUPPORT
-	VOID *pAd;
-	RT_CMD_STA_IOCTL_PMA_SA IoctlPmaSa, *pIoctlPmaSa = &IoctlPmaSa;
+	RTMP_ADAPTER *pAd;
 
+	if (!pPmksa || !pPmksa->bssid)
+		return -EINVAL;
 
-	CFG80211DBG(RT_DEBUG_ERROR, ("80211> %s ==>\n", __FUNCTION__));
+	CFG80211DBG(RT_DEBUG_OFF, ("80211> %s ==>\n", __func__));
 	MAC80211_PAD_GET(pAd, pWiphy);
 
-	if ((pPmksa->bssid == NULL) || (pPmksa->pmkid == NULL))
-		return -ENOENT;
-	/* End of if */
+	if (!pAd)
+		return -EINVAL;
 
-	pIoctlPmaSa->Cmd = RT_CMD_STA_IOCTL_PMA_SA_REMOVE;
-	pIoctlPmaSa->pBssid = (UCHAR *)pPmksa->bssid;
-	pIoctlPmaSa->pPmkid = pPmksa->pmkid;
-
-	RTMP_DRIVER_80211_PMKID_CTRL(pAd, pIoctlPmaSa);
+	/*RtmpIoctl_rt_ioctl_siwpmksa() */
+	return mt76xx_del_pmk(pAd, pPmksa->bssid);
 #endif /* CONFIG_STA_SUPPORT */
 
 	return 0;
@@ -2142,7 +2216,7 @@ static void CFG80211_OpsMgmtFrameRegister(
 	return;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
 static int CFG80211_OpsMgmtTx(
     IN struct wiphy *pWiphy,
     IN struct wireless_dev *pDev,
@@ -2671,9 +2745,22 @@ static int CFG80211_OpsChangeBss(
 static int CFG80211_OpsStaDel(
 	struct wiphy *pWiphy, 
 	struct net_device *dev,
-	UINT8 *pMacAddr)
+#if KERNEL_VERSION(3, 19, 0) <= LINUX_VERSION_CODE
+	struct station_del_parameters *params
+#else
+#if KERNEL_VERSION(3, 16, 0) <= LINUX_VERSION_CODE
+	const UINT8 * pMacAddr
+#else
+	UINT8 * pMacAddr
+#endif /* endif */
+#endif
+	)
 {
 	VOID *pAd;
+#if	KERNEL_VERSION(3, 19, 0) <= LINUX_VERSION_CODE
+	const UINT8 *pMacAddr = params->mac;
+#endif
+
 	MAC80211_PAD_GET(pAd, pWiphy);
 
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> %s ==>\n", __FUNCTION__));
@@ -2684,7 +2771,7 @@ static int CFG80211_OpsStaDel(
 	else
 	{
 		CFG80211DBG(RT_DEBUG_TRACE, ("80211> Delete STA(%02X:%02X:%02X:%02X:%02X:%02X) ==>\n", PRINT_MAC(pMacAddr)));
-		RTMP_DRIVER_80211_AP_STA_DEL(pAd, pMacAddr);
+		RTMP_DRIVER_80211_AP_STA_DEL(pAd, (void *)pMacAddr);
 	}
 
 	return 0;
@@ -2693,7 +2780,11 @@ static int CFG80211_OpsStaDel(
 static int CFG80211_OpsStaAdd(
         struct wiphy *wiphy,
         struct net_device *dev,
+#if KERNEL_VERSION(3, 16, 0) <= LINUX_VERSION_CODE
+		const UINT8 *mac,
+#else
         UINT8 *mac,
+#endif				/* endif */
 	struct station_parameters *params)
 {
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> %s ==>\n", __FUNCTION__));
@@ -2703,7 +2794,11 @@ static int CFG80211_OpsStaAdd(
 static int CFG80211_OpsStaChg(
 	struct wiphy *pWiphy,
 	struct net_device *dev,
+#if KERNEL_VERSION(3, 16, 0) <= LINUX_VERSION_CODE
+	const UINT8 *pMacAddr,
+#else
 	UINT8 *pMacAddr,
+#endif				/* endif */
 	struct station_parameters *params)
 {
 	void *pAd;
@@ -2728,11 +2823,11 @@ static int CFG80211_OpsStaChg(
 
 	if (params->sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED))
 	{
-		RTMP_DRIVER_80211_AP_MLME_PORT_SECURED(pAd, pMacAddr, 1);
+		RTMP_DRIVER_80211_AP_MLME_PORT_SECURED(pAd, (void *)pMacAddr, 1);
 	}
 	else	
 	{
-		RTMP_DRIVER_80211_AP_MLME_PORT_SECURED(pAd, pMacAddr, 0);
+		RTMP_DRIVER_80211_AP_MLME_PORT_SECURED(pAd, (void *)pMacAddr, 0);
 	}
 	return 0;
 }
@@ -2747,6 +2842,9 @@ static
         IN struct wiphy                                 *pWiphy,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
         IN const char 					*name,
+#if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
+		IN unsigned char name_assign_type,
+#endif
 #else
         IN char 					*name,
 #endif

@@ -1452,7 +1452,8 @@ int rtmp_ee_efuse_write16(
     }
     else
         eFuseWrite(pAd,Offset ,&data, 2);
-	return 0;
+
+    return 0;
 }
 
 

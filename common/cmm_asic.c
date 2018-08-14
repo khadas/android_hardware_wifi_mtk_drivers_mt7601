@@ -2966,6 +2966,10 @@ VOID RT28xxAndesWOWEnable(
 	UINT8 i;
 	CHAR NextDTIM;
 
+	RTMP_IO_READ32(pAd, PN_PAD_MODE, &Value);
+	Value &= ~0x1;
+	RTMP_IO_WRITE32(pAd, PN_PAD_MODE, Value);
+
 	if (INFRA_ON(pAd)) {
 
 		ULONG	Addr4;
@@ -3375,6 +3379,15 @@ VOID RT28xxAndesWOWDisable(
     Value |= 0xC;
     RTMP_IO_WRITE32(pAd, MAC_SYS_CTRL, Value);
 
+	/* Reset CCMP RX BMC PN before start rx in case GTK is renewed. */
+	do {
+		MAC_TABLE_ENTRY *pEntry = &pAd->MacTab.Content[BSSID_WCID];
+
+		pEntry->rx_ccmp_pn_bmc[1] = 0;
+		pEntry->rx_ccmp_pn_bmc_zero[1] = TRUE;
+		pEntry->rx_ccmp_pn_bmc[2] = 0;
+		pEntry->rx_ccmp_pn_bmc_zero[2] = TRUE;
+	} while (0);
 
     RTUSBBulkReceive(pAd);
     RTUSBBulkCmdRspEventReceive(pAd);
@@ -3400,7 +3413,10 @@ VOID RT28xxAndesWOWDisable(
 
 	RTMP_CLEAR_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDING);
 	RTMP_CLEAR_SUSPEND_FLAG(pAd, fRTMP_ADAPTER_SUSPEND_STATE_SUSPENDED);
-}
 
+	RTMP_IO_READ32(pAd, PN_PAD_MODE, &Value);
+	Value |= 0x1;
+	RTMP_IO_WRITE32(pAd, PN_PAD_MODE, Value);
+}
 #endif /* NEW_WOW_SUPPORT */
 

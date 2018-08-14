@@ -73,6 +73,7 @@ static RTMP_REG_PAIR	MT7601_MACRegTable[] = {
 	{TX_SW_CFG0,			0x402},			// 20121017 Jason Huang
 	{TX_SW_CFG1,			0x0},			// 20120822 Gary
 	{TX_SW_CFG2,			0x0},			// 20120822 Gary
+	{PN_PAD_MODE, 0x1}, /* Enable padding EIV */
 
 #ifdef HDR_TRANS_SUPPORT
 	{HEADER_TRANS_CTRL_REG, 0x2},

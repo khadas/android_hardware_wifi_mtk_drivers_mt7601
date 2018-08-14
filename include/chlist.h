@@ -59,6 +59,7 @@ typedef struct _CH_DESP {
 typedef struct _CH_REGION {
 	UCHAR CountReg[3];
 	UCHAR DfsType;			/* 0: CE, 1: FCC, 2: JAP, 3:JAP_W53, JAP_W56 */
+	BOOLEAN edcca_on;   /* TRUE or FALSE */
 	CH_DESP *pChDesp;
 } CH_REGION, *PCH_REGION;
 

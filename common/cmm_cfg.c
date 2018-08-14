@@ -184,7 +184,8 @@ INT RT_CfgSetCountryRegion(
 	if((region >= 0) && 
 	   (((band == BAND_24G) &&((region <= REGION_MAXIMUM_BG_BAND) || 
 	   (region == REGION_31_BG_BAND) || (region == REGION_32_BG_BAND) || (region == REGION_33_BG_BAND) )) || 
-	    ((band == BAND_5G) && (region <= REGION_MAXIMUM_A_BAND) ))
+		((band == BAND_5G) && (region <= REGION_MAXIMUM_A_BAND)) ||
+		((region >= REGION_BAND_START) && (region <= REGION_BAND_END)))
 	  )
 	{
 		*pCountryRegion= (UCHAR) region;

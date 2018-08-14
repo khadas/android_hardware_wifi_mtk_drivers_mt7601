@@ -55,7 +55,6 @@ VOID MT7601ATEAsicSwitchChannel(
 	UCHAR index = 0, Channel = 0;
 	/* added to prevent RF register reading error */
 	UCHAR RFValue = 0;
-//	INT IdReg;
 	RTMP_CHIP_CAP *pChipCap = &pAd->chipCap;
 
 	SYNC_CHANNEL_WITH_QA(pATEInfo, &Channel);
@@ -266,7 +265,7 @@ INT	MT7601_Set_ATE_TX_BW_Proc(
 		/* BW=20 */
 		{
 		/* Set BBP R4 bit[4:3]=0:0 */
- 		RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R4, &value);
+		RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R4, &value);
  		value &= (~0x18);
  		RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R4, value);
 		}
@@ -305,7 +304,7 @@ INT	MT7601_Set_ATE_TX_BW_Proc(
 			if (TxMode == MODE_CCK)
 			{
 				/* when Channel==14 && Mode==CCK && BandWidth==20M, BBP R4 bit5=1 */
- 				RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R4, &value);
+				RTMP_BBP_IO_READ8_BY_REG_ID(pAd, BBP_R4, &value);
 				value |= 0x20; /* set bit5=1 */
  				RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R4, value);				
 			}
@@ -390,7 +389,6 @@ BOOLEAN MT7601ATEGetTemperatureCompensationParam(
 	UCHAR BbpR47;
 	UCHAR TxRate;
 	INT32 Power;
-//	UINT count;
 	UCHAR ch = 0;
 	MT7601_TX_ALC_DATA *pTxALCData = &pAd->chipCap.TxALCData;
 
@@ -840,18 +838,10 @@ VOID MT7601ATEAsicTemperatureCompensation(
 VOID MT7601ATEAsicAdjustTxPower(
 	IN PRTMP_ADAPTER pAd) 
 {
-//	CHAR		DeltaPwr = 0;
-//	CHAR		TxAgcCompensate = 0;
-//	CHAR		DeltaPowerByBbpR1 = 0; 
-//	CHAR		TotalDeltaPower = 0; /* (non-positive number) including the transmit power controlled by the MAC and the BBP R1 */
-//	CONFIGURATION_OF_TX_POWER_CONTROL_OVER_MAC CfgOfTxPwrCtrlOverMAC = {0};	
-
-
 #ifdef RTMP_INTERNAL_TX_ALC
 	/* Get temperature compensation delta power value */
 	MT7601ATEAsicTxAlcGetAutoAgcOffset(pAd);
 #endif /* RTMP_INTERNAL_TX_ALC */
-
 }
 
 
@@ -869,9 +859,7 @@ INT	MT7601_Set_ATE_TX_FREQ_OFFSET_Proc(
 	IN	PSTRING			arg)
 {
 	UCHAR RFFreqOffset = 0;
-//	ULONG R4 = 0;
 	UCHAR RFValue = 0;
-//	UCHAR PreRFValue = 0;
 	RFFreqOffset = simple_strtol(arg, 0, 10);
 
 	pAd->ate.RFFreqOffset = RFFreqOffset;
@@ -901,9 +889,7 @@ INT	MT7601_Set_ATE_TX_FREQ_OFFSET_Proc(
 VOID MT7601ATERxVGAInit(
 	IN PRTMP_ADAPTER		pAd)
 {
-//	PATE_INFO pATEInfo = &(pAd->ate);
 	UCHAR R66 = 0x14;
-//	CHAR LNAGain = GET_LNA_GAIN(pAd);
 	
 	//RTMP_BBP_IO_WRITE8_BY_REG_ID(pAd, BBP_R66, 0x14);
 

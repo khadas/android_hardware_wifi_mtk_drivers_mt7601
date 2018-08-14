@@ -1549,7 +1549,17 @@ enum WIFI_MODE{
 #define REGION_19_A_BAND                  19
 #define REGION_20_A_BAND                  20
 #define REGION_21_A_BAND                  21
-#define REGION_MAXIMUM_A_BAND             37
+#define REGION_22_A_BAND                  22
+#define REGION_23_A_BAND                  23
+#define REGION_MAXIMUM_A_BAND             23
+
+/* Country Region for specific country */
+#define REGION_50_BAND                    50
+#define REGION_51_BAND                    51
+#define REGION_52_BAND                    52
+#define REGION_53_BAND                    53
+#define REGION_BAND_START                 REGION_50_BAND
+#define REGION_BAND_END                   REGION_53_BAND
 
 /* The security mode definition in MAC register */
 #define CIPHER_NONE                 0

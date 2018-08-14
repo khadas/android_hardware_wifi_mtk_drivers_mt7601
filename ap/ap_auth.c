@@ -168,7 +168,7 @@ static VOID APPeerDeauthReqAction(
     if (! PeerDeauthReqSanity(pAd, Elem->Msg, Elem->MsgLen, Addr2, &SeqNum, &Reason)) 
         return;
 
-	pEntry = NULL;
+    pEntry = NULL;
 
 	/*pEntry = MacTableLookup(pAd, Addr2); */
 	if (Elem->Wcid < MAX_LEN_OF_MAC_TABLE)

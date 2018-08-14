@@ -927,6 +927,11 @@ if (0 /*!(pRxInfo->Mcast || pRxInfo->Bcast)*/){
 			return;
 		}
 
+		if (pSwKey->CipherAlg == CIPHER_AES) {
+			/* store PN and pn_len before sw-dec */
+			memcpy(pRxBlk->eiv_pn, pRxBlk->pData, LEN_CCMP_HDR);
+			pRxInfo->pn_len = LEN_CCMP_HDR / 4; /* dword count */
+		}
 		/* Decryption by Software */
 		if (RTMPSoftDecryptionAction(pAd,
 					     (PUCHAR) pHeader,
@@ -942,8 +947,48 @@ if (0 /*!(pRxInfo->Mcast || pRxInfo->Bcast)*/){
 		}
 		/* Record the Decrypted bit as 1 */
 		pRxInfo->Decrypted = 1;
-	}
+	} else
 #endif /* SOFT_ENCRYPT || ADHOC_WPA2PSK_SUPPORT */
+	do {
+		/* Store hw padded IV/EIV (if any) and move pRxBlk->pData.
+		 *
+		 * @pRxBlk: rx descriptor block
+		 * @pRxInfo: rxinfo in rxblk hw_rx_info
+		 * @pRxWI: rxwi in pRxPacket
+		 */
+		UINT32 pn_len_byte;
+
+		if (!pRxInfo->pn_len) {
+			DBGPRINT(RT_DEBUG_INFO, ("no IV/EIV padded\n"));
+			break; /* no IV/EIV padding */
+		}
+
+		pn_len_byte = pRxInfo->pn_len * 4;
+		if (unlikely(pRxBlk->DataSize <= pn_len_byte)) {
+			/* not enough data */
+			DBGPRINT(RT_DEBUG_ERROR, ("DataSize %u <= pn_len %u\n",
+				pRxBlk->DataSize, pn_len_byte));
+			RELEASE_NDIS_PACKET(pAd, pRxPacket,
+				NDIS_STATUS_FAILURE);
+			return;
+		}
+
+		if (unlikely(sizeof(pRxBlk->eiv_pn) <= pn_len_byte)) {
+			/* not enough eiv_pn buffer */
+			DBGPRINT(RT_DEBUG_ERROR,
+				("pRxBlk->eiv_pn size %zu <= pn_len %u\n",
+				sizeof(pRxBlk->eiv_pn), pn_len_byte));
+			RELEASE_NDIS_PACKET(pAd, pRxPacket,
+				NDIS_STATUS_FAILURE);
+			return;
+		}
+
+		/* store padded IV/EIV in rxblk */
+		memcpy(pRxBlk->eiv_pn, pRxBlk->pData, pn_len_byte);
+		/* move pRxBlk->pData pointer */
+		pRxBlk->pData += pn_len_byte;
+		pRxBlk->DataSize -= pn_len_byte;
+	} while (0);
 
 #ifdef DOT11Z_TDLS_SUPPORT
 #ifdef TDLS_AUTOLINK_SUPPORT
@@ -987,6 +1032,40 @@ if (0 /*!(pRxInfo->Mcast || pRxInfo->Bcast)*/){
 			if (pAdhocEntry)
 				Update_Rssi_Sample(pAd, &pAdhocEntry->RssiSample, pRxWI);
 		}
+
+		do {
+			/* Update MT7601 PN value only for AES CCMP BMC pkts
+			 *
+			 * @pRxBlk: rx descriptor block
+			 * @pRxInfo: rxinfo in rxblk hw_rx_info
+			 * @pKey: RX GTK entry
+			 */
+			PCIPHER_KEY pKey;
+
+			if (!pRxInfo->pn_len || pRxInfo->pn_len != 2) {
+				DBGPRINT(RT_DEBUG_INFO, ("no EIV\n"));
+				break; /* handle CCMP 2 dwords only */
+			}
+
+			/* search key and cipher */
+			pKey = RTMPSwCipherKeySelection(pAd, pRxBlk->eiv_pn,
+							pRxBlk, pEntry);
+			/* ignore non-aes */
+			if (!pKey || pKey->CipherAlg != CIPHER_AES) {
+				DBGPRINT(RT_DEBUG_INFO, ("non-aes cipher %u\n",
+					(pKey) ? pKey->CipherAlg : 0xFF));
+				break;
+			}
+
+			/* get PN from pRxBlk->eiv_pn[] */
+			pRxBlk->ccmp_pn = le32_to_cpu(get_unaligned((const u32 *)&pRxBlk->eiv_pn[4]));
+			pRxBlk->ccmp_pn <<= 16;
+			pRxBlk->ccmp_pn += le16_to_cpu(get_unaligned((const u16 *)&pRxBlk->eiv_pn[0]));
+			pRxBlk->ccmp_pn_valid = TRUE;
+			DBGPRINT(RT_DEBUG_WARN, ("BMC aes k %u b %u pn %llu w %u\n",
+				pRxBlk->key_idx, pRxBlk->bss_idx,
+				pRxBlk->ccmp_pn, pRxBlk->wcid));
+		} while (0);
 
 		Indicate_Legacy_Packet(pAd, pRxBlk, FromWhichBSSID);
 		return;

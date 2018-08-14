@@ -347,9 +347,11 @@ VOID RTMP_CFG80211_VirtualIF_Init(
 	netDevHook.xmit = CFG80211_VirtualIF_PacketSend; /* hard transmit hook point */
 	netDevHook.ioctl = CFG80211_VirtualIF_Ioctl;	 /* ioctl hook point */
 
+#ifdef CONFIG_APSTA_MIXED_SUPPORT
 #if WIRELESS_EXT >= 12
 	netDevHook.iw_handler = (void *)&rt28xx_ap_iw_handler_def;
 #endif /* WIRELESS_EXT >= 12 */
+#endif /* CONFIG_APSTA_MIXED_SUPPORT */
 		
 	//if (DevType == RT_CMD_80211_IFTYPE_P2P_CLIENT)
 	//	Inf = INT_APCLI;
